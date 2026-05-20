@@ -18,6 +18,7 @@ export async function PATCH(req: Request) {
   if ('globalDurationSec' in body) update.globalDurationSec = body.globalDurationSec;
   if ('videoEnabled' in body) update.videoEnabled = body.videoEnabled;
   if ('missionStatement' in body) update.missionStatement = body.missionStatement;
+  if ('logoMediaId' in body) update.logoMediaId = body.logoMediaId;
 
   const [updated] = await db
     .update(settings)

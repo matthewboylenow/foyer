@@ -12,6 +12,8 @@ import { Separator } from '@/components/ui/separator';
 import { ActiveToggle } from './ActiveToggle';
 import { TimePicker } from './TimePicker';
 import { PasteParser } from './PasteParser';
+import { LivePreview } from './LivePreview';
+import { ImageUpload } from './ImageUpload';
 import { templates } from '@/components/templates';
 import type { TemplateKey } from '@/components/templates';
 import type { SlideWithContent, SlideContent, MassScheduleRow } from '@/lib/db/schema';
@@ -20,6 +22,12 @@ import type { TimeValue } from '@/lib/time';
 interface SlideEditorProps {
   templateType: TemplateKey;
   initialSlide: SlideWithContent | null;
+  tenantLogoUrl?: string | null;
+  initialMedia?: {
+    logoUrl?: string | null;
+    bgImageUrl?: string | null;
+    phoneMockupUrl?: string | null;
+  };
 }
 
 function defaultContent(templateType: TemplateKey): SlideContent {
@@ -41,7 +49,7 @@ function defaultContent(templateType: TemplateKey): SlideContent {
   }
 }
 
-export function SlideEditor({ templateType, initialSlide }: SlideEditorProps) {
+export function SlideEditor({ templateType, initialSlide, tenantLogoUrl, initialMedia }: SlideEditorProps) {
   const router = useRouter();
   const isNew = !initialSlide;
 
@@ -67,6 +75,10 @@ export function SlideEditor({ templateType, initialSlide }: SlideEditorProps) {
   const [active, setActive] = useState(initialSlide?.active ?? true);
   const [saving, setSaving] = useState(false);
   const [savedState, setSavedState] = useState<'idle' | 'saved' | 'error'>('idle');
+  // Track resolved media URLs for live preview (not persisted — looked up server-side from IDs)
+  const [bgImageUrl, setBgImageUrl] = useState<string | null>(initialMedia?.bgImageUrl ?? null);
+  const [phoneMockupUrl, setPhoneMockupUrl] = useState<string | null>(initialMedia?.phoneMockupUrl ?? null);
+  const [slideLogoUrl, setSlideLogoUrl] = useState<string | null>(initialMedia?.logoUrl ?? null);
 
   const templateConfig = templates[templateType];
 
@@ -197,11 +209,45 @@ export function SlideEditor({ templateType, initialSlide }: SlideEditorProps) {
             templateType={templateType}
             content={content}
             onChange={(c) => setContent(c)}
+            bgImageUrl={bgImageUrl}
+            onBgImageChange={setBgImageUrl}
+            phoneMockupUrl={phoneMockupUrl}
+            onPhoneMockupChange={setPhoneMockupUrl}
+            slideLogoUrl={slideLogoUrl}
+            onSlideLogoChange={setSlideLogoUrl}
           />
         </div>
 
         {/* Right: Schedule + settings (40%) */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Live preview */}
+          <div className="p-4 border border-border rounded-lg">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-medium text-sm">Preview</h3>
+              {!isNew && initialSlide && (
+                <a
+                  href={`/display/__preview?slideId=${initialSlide.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-navy underline"
+                >
+                  Full size ↗
+                </a>
+              )}
+            </div>
+            <LivePreview
+              templateType={templateType}
+              content={content}
+              logoUrl={slideLogoUrl ?? tenantLogoUrl ?? null}
+              bgImageUrl={bgImageUrl}
+              phoneMockupUrl={phoneMockupUrl}
+              width={280}
+            />
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Live preview at 26% scale. Animations replay 500ms after you stop typing.
+            </p>
+          </div>
+
           {/* Active toggle */}
           {!isNew && initialSlide && (
             <div className="p-4 border border-border rounded-lg">
@@ -302,17 +348,6 @@ export function SlideEditor({ templateType, initialSlide }: SlideEditorProps) {
             </div>
           </div>
 
-          {/* Preview link */}
-          {!isNew && initialSlide && (
-            <a
-              href={`/display/__preview?slideId=${initialSlide.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block text-center text-sm text-navy underline py-2"
-            >
-              Preview at full size ↗
-            </a>
-          )}
         </div>
       </div>
     </div>
@@ -325,9 +360,25 @@ interface TemplateFieldsProps {
   templateType: TemplateKey;
   content: SlideContent;
   onChange: (c: SlideContent) => void;
+  bgImageUrl: string | null;
+  onBgImageChange: (url: string | null) => void;
+  phoneMockupUrl: string | null;
+  onPhoneMockupChange: (url: string | null) => void;
+  slideLogoUrl: string | null;
+  onSlideLogoChange: (url: string | null) => void;
 }
 
-function TemplateFields({ templateType, content, onChange }: TemplateFieldsProps) {
+function TemplateFields({
+  templateType,
+  content,
+  onChange,
+  bgImageUrl,
+  onBgImageChange,
+  phoneMockupUrl,
+  onPhoneMockupChange,
+  slideLogoUrl,
+  onSlideLogoChange,
+}: TemplateFieldsProps) {
   function set(key: string, value: unknown) {
     onChange({ ...content, [key]: value } as SlideContent);
   }
@@ -345,6 +396,22 @@ function TemplateFields({ templateType, content, onChange }: TemplateFieldsProps
             <Label>Subline (optional)</Label>
             <Input value={c.subline ?? ''} onChange={(e) => set('subline', e.target.value)} placeholder="A Community of Faith" />
           </div>
+          <p className="text-xs text-muted-foreground">
+            Uses the tenant logo from Settings by default. Upload a different logo here to override on this slide only.
+          </p>
+          <ImageUpload
+            label="Slide-specific logo (optional)"
+            type="logo"
+            currentUrl={slideLogoUrl}
+            onUploaded={({ id, blobUrl }) => {
+              set('logoMediaId', id);
+              onSlideLogoChange(blobUrl);
+            }}
+            onCleared={() => {
+              set('logoMediaId', undefined);
+              onSlideLogoChange(null);
+            }}
+          />
         </div>
       );
     }
@@ -392,6 +459,19 @@ function TemplateFields({ templateType, content, onChange }: TemplateFieldsProps
               <option value="splitReveal">Split reveal (dramatic)</option>
             </select>
           </div>
+          <ImageUpload
+            label="Background image (optional)"
+            type="image"
+            currentUrl={bgImageUrl}
+            onUploaded={({ id, blobUrl }) => {
+              set('bgImageMediaId', id);
+              onBgImageChange(blobUrl);
+            }}
+            onCleared={() => {
+              set('bgImageMediaId', undefined);
+              onBgImageChange(null);
+            }}
+          />
         </div>
       );
     }
@@ -475,6 +555,19 @@ function TemplateFields({ templateType, content, onChange }: TemplateFieldsProps
             <Label>URL</Label>
             <Input value={c.url} onChange={(e) => set('url', e.target.value)} placeholder="sainthelen.org/app" />
           </div>
+          <ImageUpload
+            label="Phone mockup image (optional)"
+            type="image"
+            currentUrl={phoneMockupUrl}
+            onUploaded={({ id, blobUrl }) => {
+              set('phoneMockupMediaId', id);
+              onPhoneMockupChange(blobUrl);
+            }}
+            onCleared={() => {
+              set('phoneMockupMediaId', undefined);
+              onPhoneMockupChange(null);
+            }}
+          />
         </div>
       );
     }

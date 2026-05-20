@@ -1,13 +1,14 @@
 import { auth } from '@/lib/auth/config';
-import { getDefaultTenant, getSettingsByTenant } from '@/lib/db/queries';
+import { getDefaultTenant, getSettingsWithMedia } from '@/lib/db/queries';
 import { SettingsForm } from '@/components/admin/SettingsForm';
+import { LogoSection } from '@/components/admin/LogoSection';
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/lib/auth/config';
 
 export default async function SettingsPage() {
   const session = await auth();
   const tenant = await getDefaultTenant();
-  const settings = tenant ? await getSettingsByTenant(tenant.id) : null;
+  const settings = tenant ? await getSettingsWithMedia(tenant.id) : null;
 
   return (
     <div className="max-w-2xl">
@@ -17,26 +18,37 @@ export default async function SettingsPage() {
 
       <div className="space-y-8">
         {/* Brand */}
-        <section className="border border-border rounded-lg p-6 space-y-4">
-          <h2 className="font-medium">Brand</h2>
-          <p className="text-sm text-muted-foreground">
-            Brand colors are locked to Saint Helen values in v1. Logo upload coming soon.
-          </p>
-          <div className="flex gap-3">
-            {[
-              { label: 'Navy', hex: '#1F346D' },
-              { label: 'Rust', hex: '#CD5334' },
-              { label: 'Cream', hex: '#FAF9F7' },
-              { label: 'Gold', hex: '#D4AF37' },
-            ].map((c) => (
-              <div key={c.label} className="flex items-center gap-2">
-                <span
-                  className="w-5 h-5 rounded-full border border-border"
-                  style={{ backgroundColor: c.hex }}
-                />
-                <span className="text-xs text-muted-foreground">{c.label}</span>
-              </div>
-            ))}
+        <section className="border border-border rounded-lg p-6 space-y-6">
+          <div>
+            <h2 className="font-medium">Brand</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Logo appears on the Parish Identity slide. Use a transparent PNG or SVG with light strokes for the dark navy background.
+            </p>
+          </div>
+
+          <LogoSection
+            initialLogoId={settings?.logoMediaId ?? null}
+            initialLogoUrl={settings?.logoMedia?.blobUrl ?? null}
+          />
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Brand colors (locked in v1)</p>
+            <div className="flex gap-3">
+              {[
+                { label: 'Navy', hex: '#1F346D' },
+                { label: 'Rust', hex: '#CD5334' },
+                { label: 'Cream', hex: '#FAF9F7' },
+                { label: 'Gold', hex: '#D4AF37' },
+              ].map((c) => (
+                <div key={c.label} className="flex items-center gap-2">
+                  <span
+                    className="w-5 h-5 rounded-full border border-border"
+                    style={{ backgroundColor: c.hex }}
+                  />
+                  <span className="text-xs text-muted-foreground">{c.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 

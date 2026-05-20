@@ -6,14 +6,18 @@ import { buildShuffledPool, slidesHaveChanged } from './shuffle';
 import { templates } from '@/components/templates';
 import type { SlideWithContent } from '@/lib/db/schema';
 
+type PlayerSlide = SlideWithContent & {
+  resolvedMedia?: Record<string, string>;
+};
+
 const POLL_INTERVAL_MS = 30_000;
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-function loadFromCache(displayId: string): SlideWithContent[] {
+function loadFromCache(displayId: string): PlayerSlide[] {
   try {
     const raw = localStorage.getItem(`lastFetch:${displayId}`);
     if (!raw) return [];
-    const { slides, savedAt } = JSON.parse(raw) as { slides: SlideWithContent[]; savedAt: number };
+    const { slides, savedAt } = JSON.parse(raw) as { slides: PlayerSlide[]; savedAt: number };
     if (Date.now() - savedAt > CACHE_TTL_MS) return [];
     return slides;
   } catch {
@@ -21,7 +25,7 @@ function loadFromCache(displayId: string): SlideWithContent[] {
   }
 }
 
-function saveToCache(displayId: string, slides: SlideWithContent[]) {
+function saveToCache(displayId: string, slides: PlayerSlide[]) {
   try {
     localStorage.setItem(
       `lastFetch:${displayId}`,
@@ -32,7 +36,7 @@ function saveToCache(displayId: string, slides: SlideWithContent[]) {
   }
 }
 
-const FALLBACK_SLIDE: SlideWithContent = {
+const FALLBACK_SLIDE: PlayerSlide = {
   id: '__fallback__',
   tenantId: '',
   templateType: 'parish_identity',
@@ -60,10 +64,10 @@ interface PlayerProps {
 }
 
 export function Player({ displayId }: PlayerProps) {
-  const [slides, setSlides] = useState<SlideWithContent[]>([]);
-  const [pool, setPool] = useState<SlideWithContent[]>([]);
+  const [slides, setSlides] = useState<PlayerSlide[]>([]);
+  const [pool, setPool] = useState<PlayerSlide[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const queuedSlidesRef = useRef<SlideWithContent[] | null>(null);
+  const queuedSlidesRef = useRef<PlayerSlide[] | null>(null);
   const [ready, setReady] = useState(false);
 
   // Initial load: try API then cache then fallback
@@ -72,7 +76,7 @@ export function Player({ displayId }: PlayerProps) {
       try {
         const res = await fetch(`/api/display/${displayId}`, { cache: 'no-store' });
         if (res.ok) {
-          const data: SlideWithContent[] = await res.json();
+          const data: PlayerSlide[] = await res.json();
           if (data.length > 0) {
             saveToCache(displayId, data);
             setSlides(data);
@@ -105,7 +109,7 @@ export function Player({ displayId }: PlayerProps) {
       try {
         const res = await fetch(`/api/display/${displayId}`, { cache: 'no-store' });
         if (!res.ok) return;
-        const data: SlideWithContent[] = await res.json();
+        const data: PlayerSlide[] = await res.json();
         if (slidesHaveChanged(slides, data)) {
           queuedSlidesRef.current = data;
           saveToCache(displayId, data);
@@ -187,9 +191,10 @@ export function Player({ displayId }: PlayerProps) {
   const holdMs =
     (current.durationOverrideSec ?? templateConfig.defaultDurationSec) * 1000;
 
-  const SlideComponent = templateConfig.component as React.ComponentType<{
-    content: SlideWithContent['content'];
-  }>;
+  // Pass content + resolved media URLs as extra props
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const SlideComponent = templateConfig.component as React.ComponentType<any>;
+  const resolved = current.resolvedMedia ?? {};
 
   return (
     <div className="relative w-full h-full">
@@ -198,7 +203,12 @@ export function Player({ displayId }: PlayerProps) {
         holdMs={holdMs}
         onDone={handleSlideDone}
       >
-        <SlideComponent content={current.content} />
+        <SlideComponent
+          content={current.content}
+          logoUrl={resolved.logoUrl}
+          bgImageUrl={resolved.bgImageUrl}
+          phoneMockupUrl={resolved.phoneMockupUrl}
+        />
       </SlideFrame>
     </div>
   );

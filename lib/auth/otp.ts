@@ -24,7 +24,9 @@ export async function sendOtp(email: string): Promise<void> {
     expiresAt: new Date(Date.now() + 10 * 60 * 1000),
   });
 
-  const from = process.env.EMAIL_FROM ?? 'Saint Helen Signage <no-reply@sainthelen.org>';
+  // Strip surrounding quotes if env var was set with literal quotes (common in dashboards)
+  const fromRaw = process.env.EMAIL_FROM ?? 'Saint Helen Signage <no-reply@sending.sainthelen.org>';
+  const from = fromRaw.trim().replace(/^["']|["']$/g, '');
   const resend = getResend();
 
   await resend.emails.send({
