@@ -2,6 +2,9 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth/config';
 import { AdminNav } from '@/components/admin/AdminNav';
 
+// Admin pages must always reflect the latest DB state — no CDN caching of HTML.
+export const dynamic = 'force-dynamic';
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session && process.env.AUTH_DEV_BYPASS !== '1') {
