@@ -1,6 +1,6 @@
 import type { ParseResult } from './types';
 
-const WEEKEND_TIME = /^\s*(1[0-2]|[1-9]):([0-5][0-9])\s*(AM|PM|am|pm)\s*$/;
+const WEEKEND_TIME = /^\s*(1[0-2]|[1-9]):([0-5][0-9])\s*(am|pm)\s*$/i;
 const SEPARATORS = [' - ', ' – ', ' — ', '\t'];
 
 function normalizeInput(s: string): string {
