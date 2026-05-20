@@ -170,11 +170,16 @@ export type ParishIdentityContent = {
   bgVideoMediaId?: string;
 };
 
+export type TextMode = 'light' | 'dark';
+
 export type WelcomeQuoteContent = {
   templateType: 'welcome_quote';
   quote: string;
   quoteSize?: SizePreset;          // default: 'large' (= original spec size)
   attribution?: string;
+  bgImageMediaId?: string;
+  /** 'dark' = dark text on light bg (default), 'light' = light text on dark bg. */
+  textMode?: TextMode;
 };
 
 export type GeneralContent = {
@@ -185,6 +190,7 @@ export type GeneralContent = {
   meta?: string;
   bgImageMediaId?: string;
   motionStyle?: 'splitReveal' | 'lineMask';
+  textMode?: TextMode;
 };
 
 export type MassScheduleRow = {
@@ -206,20 +212,28 @@ export type MassScheduleContent = {
   // Legacy single-section format:
   scheduleKind?: 'weekend' | 'weekday';
   rows?: MassScheduleRow[];
+  bgImageMediaId?: string;
+  textMode?: TextMode;
 };
 
 export type WeeklyAssociationContent = {
   templateType: 'weekly_association';
   names: string[];
+  bgImageMediaId?: string;
+  textMode?: TextMode;
 };
 
+/** Dark-themed by design (candle SVG assumes a near-black bg).
+ *  Bg image supported but text mode is fixed to 'light'. */
 export type SanctuaryCandleContent = {
   templateType: 'sanctuary_candle';
   name: string;
   nameSize?: SizePreset;           // default: 'large' (= original spec size)
   inMemoryOf?: boolean;
+  bgImageMediaId?: string;
 };
 
+/** Dark-themed by design. Bg image supported, text mode fixed to 'light'. */
 export type AppPromoContent = {
   templateType: 'app_promo';
   headline: string;
@@ -227,6 +241,7 @@ export type AppPromoContent = {
   body: string;
   url: string;
   phoneMockupMediaId?: string;
+  bgImageMediaId?: string;
 };
 
 export type SlideContent =

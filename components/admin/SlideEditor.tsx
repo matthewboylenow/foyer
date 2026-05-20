@@ -15,13 +15,14 @@ import { PasteParser } from './PasteParser';
 import { LivePreview } from './LivePreview';
 import { ImageUpload } from './ImageUpload';
 import { VideoUpload } from './VideoUpload';
+import { StyleSection } from './StyleSection';
 import { SizeButtons } from './SizeButtons';
 import { PercentageSlider } from './PercentageSlider';
 import { RichTextEditor } from './RichTextEditor';
 import { resolveLogoPercent } from '@/components/templates/sizing';
 import { templates } from '@/components/templates';
 import type { TemplateKey } from '@/components/templates';
-import type { SlideWithContent, SlideContent, MassScheduleRow, SizePreset } from '@/lib/db/schema';
+import type { SlideWithContent, SlideContent, MassScheduleRow, SizePreset, TextMode } from '@/lib/db/schema';
 import type { TimeValue } from '@/lib/time';
 
 interface SlideEditorProps {
@@ -550,6 +551,20 @@ function TemplateFields({
             <Label>Attribution (optional)</Label>
             <Input value={c.attribution ?? ''} onChange={(e) => set('attribution', e.target.value)} placeholder="Matthew 11:28" />
           </div>
+          <StyleSection
+            bgImageUrl={bgImageUrl}
+            onBgImageUploaded={(id, blobUrl) => {
+              set('bgImageMediaId', id);
+              onBgImageChange(blobUrl);
+            }}
+            onBgImageCleared={() => {
+              set('bgImageMediaId', undefined);
+              onBgImageChange(null);
+            }}
+            textMode={c.textMode}
+            defaultTextMode="dark"
+            onTextModeChange={(m: TextMode) => set('textMode', m)}
+          />
         </div>
       );
     }
@@ -595,18 +610,19 @@ function TemplateFields({
               <option value="splitReveal">Split reveal (dramatic)</option>
             </select>
           </div>
-          <ImageUpload
-            label="Background image (optional)"
-            type="image"
-            currentUrl={bgImageUrl}
-            onUploaded={({ id, blobUrl }) => {
+          <StyleSection
+            bgImageUrl={bgImageUrl}
+            onBgImageUploaded={(id, blobUrl) => {
               set('bgImageMediaId', id);
               onBgImageChange(blobUrl);
             }}
-            onCleared={() => {
+            onBgImageCleared={() => {
               set('bgImageMediaId', undefined);
               onBgImageChange(null);
             }}
+            textMode={c.textMode}
+            defaultTextMode="dark"
+            onTextModeChange={(m: TextMode) => set('textMode', m)}
           />
         </div>
       );
@@ -665,6 +681,21 @@ function TemplateFields({
               }
             />
           </div>
+
+          <StyleSection
+            bgImageUrl={bgImageUrl}
+            onBgImageUploaded={(id, blobUrl) => {
+              set('bgImageMediaId', id);
+              onBgImageChange(blobUrl);
+            }}
+            onBgImageCleared={() => {
+              set('bgImageMediaId', undefined);
+              onBgImageChange(null);
+            }}
+            textMode={c.textMode}
+            defaultTextMode="dark"
+            onTextModeChange={(m: TextMode) => set('textMode', m)}
+          />
         </div>
       );
     }
@@ -672,11 +703,27 @@ function TemplateFields({
     case 'weekly_association': {
       const c = content as Extract<SlideContent, { templateType: 'weekly_association' }>;
       return (
-        <PasteParser
-          templateType="weekly_association"
-          savedRows={c.names.map((name) => ({ name, needsReview: false }))}
-          onParsed={(rows) => set('names', (rows as { name: string }[]).map((r) => r.name))}
-        />
+        <div className="space-y-6">
+          <PasteParser
+            templateType="weekly_association"
+            savedRows={c.names.map((name) => ({ name, needsReview: false }))}
+            onParsed={(rows) => set('names', (rows as { name: string }[]).map((r) => r.name))}
+          />
+          <StyleSection
+            bgImageUrl={bgImageUrl}
+            onBgImageUploaded={(id, blobUrl) => {
+              set('bgImageMediaId', id);
+              onBgImageChange(blobUrl);
+            }}
+            onBgImageCleared={() => {
+              set('bgImageMediaId', undefined);
+              onBgImageChange(null);
+            }}
+            textMode={c.textMode}
+            defaultTextMode="dark"
+            onTextModeChange={(m: TextMode) => set('textMode', m)}
+          />
+        </div>
       );
     }
 
@@ -704,6 +751,17 @@ function TemplateFields({
             />
             <Label>{c.inMemoryOf ? 'In Memory Of' : 'In Honor Of'}</Label>
           </div>
+          <StyleSection
+            bgImageUrl={bgImageUrl}
+            onBgImageUploaded={(id, blobUrl) => {
+              set('bgImageMediaId', id);
+              onBgImageChange(blobUrl);
+            }}
+            onBgImageCleared={() => {
+              set('bgImageMediaId', undefined);
+              onBgImageChange(null);
+            }}
+          />
         </div>
       );
     }
@@ -740,6 +798,17 @@ function TemplateFields({
             onCleared={() => {
               set('phoneMockupMediaId', undefined);
               onPhoneMockupChange(null);
+            }}
+          />
+          <StyleSection
+            bgImageUrl={bgImageUrl}
+            onBgImageUploaded={(id, blobUrl) => {
+              set('bgImageMediaId', id);
+              onBgImageChange(blobUrl);
+            }}
+            onBgImageCleared={() => {
+              set('bgImageMediaId', undefined);
+              onBgImageChange(null);
             }}
           />
         </div>

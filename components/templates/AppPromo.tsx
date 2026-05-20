@@ -1,28 +1,42 @@
 'use client';
 
-import { motion } from 'motion/react';
 import { LineMask } from '@/components/motion/LineMask';
 import { WordStagger } from '@/components/motion/WordStagger';
 import { GradientShift } from '@/components/motion/GradientShift';
 import { BlurIn } from '@/components/motion/BlurIn';
 import { FilmGrain } from '@/components/motion/FilmGrain';
 import { GlowPulse } from '@/components/motion/GlowPulse';
+import { KenBurns } from '@/components/motion/KenBurns';
 import { Drift } from '@/components/motion/Drift';
 import { APP_PROMO_HEADLINE_SIZE, resolveSize } from './sizing';
 import type { AppPromoContent } from '@/lib/db/schema';
 
 interface AppPromoProps {
   content: AppPromoContent;
+  bgImageUrl?: string;
   phoneMockupUrl?: string;
 }
 
-export function AppPromo({ content, phoneMockupUrl }: AppPromoProps) {
+export function AppPromo({ content, bgImageUrl, phoneMockupUrl }: AppPromoProps) {
   const { headline, body, url, headlineSize } = content;
   const headlinePx = resolveSize(APP_PROMO_HEADLINE_SIZE, headlineSize);
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-navy-900">
-      <GradientShift colors={['#1F346D', '#1A1B4E']} duration={24000} pattern="shift" />
+      {bgImageUrl ? (
+        <>
+          <KenBurns src={bgImageUrl} duration={28000} />
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(180deg, rgba(11,19,42,0.68) 0%, rgba(11,19,42,0.5) 50%, rgba(11,19,42,0.82) 100%)',
+            }}
+          />
+        </>
+      ) : (
+        <GradientShift colors={['#1F346D', '#1A1B4E']} duration={24000} pattern="shift" />
+      )}
 
       {/* Gold glow that suggests "light from the phone" */}
       <GlowPulse color="rgba(212,175,55,0.12)" size={650} y="55%" duration={8000} />

@@ -5,6 +5,7 @@ import { WordStagger } from '@/components/motion/WordStagger';
 import { BlurIn } from '@/components/motion/BlurIn';
 import { FilmGrain } from '@/components/motion/FilmGrain';
 import { GlowPulse } from '@/components/motion/GlowPulse';
+import { KenBurns } from '@/components/motion/KenBurns';
 import { SANCTUARY_CANDLE_NAME_SIZE, resolveSize } from './sizing';
 import type { SanctuaryCandleContent } from '@/lib/db/schema';
 
@@ -17,13 +18,32 @@ const EMBERS = Array.from({ length: 8 }, (_, i) => ({
   size: 2 + Math.random() * 2,
 }));
 
-export function SanctuaryCandle({ content }: { content: SanctuaryCandleContent }) {
+interface SanctuaryCandleProps {
+  content: SanctuaryCandleContent;
+  bgImageUrl?: string;
+}
+
+export function SanctuaryCandle({ content, bgImageUrl }: SanctuaryCandleProps) {
   const { name, inMemoryOf = true, nameSize } = content;
   const captionLine = inMemoryOf ? 'In Memory Of' : 'In Honor Of';
   const namePx = resolveSize(SANCTUARY_CANDLE_NAME_SIZE, nameSize);
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-ink">
+      {/* Optional bg image with a heavy dark wash — candle SVG needs near-black behind it. */}
+      {bgImageUrl && (
+        <>
+          <KenBurns src={bgImageUrl} duration={32000} />
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(180deg, rgba(11,13,18,0.78) 0%, rgba(11,13,18,0.62) 45%, rgba(11,13,18,0.85) 100%)',
+            }}
+          />
+        </>
+      )}
+
       {/* Layered glows for depth */}
       <GlowPulse
         color="rgba(212,175,55,0.16)"
