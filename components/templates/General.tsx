@@ -6,6 +6,7 @@ import { SplitReveal } from '@/components/motion/SplitReveal';
 import { KenBurns } from '@/components/motion/KenBurns';
 import { BlurIn } from '@/components/motion/BlurIn';
 import { FilmGrain } from '@/components/motion/FilmGrain';
+import { AutoFitText } from './AutoFitText';
 import { GENERAL_HEADLINE_SIZE, resolveSize } from './sizing';
 import type { GeneralContent } from '@/lib/db/schema';
 
@@ -79,13 +80,20 @@ export function General({ content, bgImageUrl }: GeneralProps) {
           </BlurIn>
         )}
 
-        {/* Body (rich-text HTML). Skip if empty after stripping tags. */}
+        {/* Body — auto-shrinks from 48px down to 24px if content is long */}
         {body && body.replace(/<[^>]*>/g, '').trim() && (
-          <BlurIn delay={1500} duration={1100} y={10} blur={8}>
-            <div
+          <BlurIn
+            delay={1500}
+            duration={1100}
+            y={10}
+            blur={8}
+            className="flex-1 min-h-0 overflow-hidden"
+          >
+            <AutoFitText
+              html={body}
+              maxSize={48}
+              minSize={24}
               className="font-sans text-navy leading-relaxed [&_p]:m-0 [&_p+p]:mt-4 [&_ul]:list-disc [&_ul]:pl-8 [&_li]:mt-1 [&_strong]:font-semibold [&_em]:italic"
-              style={{ fontSize: 48 }}
-              dangerouslySetInnerHTML={{ __html: body }}
             />
           </BlurIn>
         )}

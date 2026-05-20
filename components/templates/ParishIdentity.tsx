@@ -72,7 +72,10 @@ export function ParishIdentity({ content, logoUrl }: ParishIdentityProps) {
                 alt="Parish logo"
                 style={{
                   maxWidth: logoMaxWidth,
-                  maxHeight: logoMaxWidth * 0.5,
+                  // Cap height at ~70% of width — accommodates square logos (which
+                  // render at logoMaxWidth × 0.7) and wide wordmarks (which
+                  // remain bound by maxWidth + their natural aspect ratio).
+                  maxHeight: logoMaxWidth * 0.7,
                   objectFit: 'contain',
                   filter: 'drop-shadow(0 8px 28px rgba(0,0,0,0.35))',
                 }}

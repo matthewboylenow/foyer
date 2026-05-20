@@ -5,8 +5,10 @@ import type { SizePreset } from '@/lib/db/schema';
 // Default is 'large' so existing slides + new slides without a chosen size
 // render at the original/spec size.
 
-// Logo: max 480px = 100%. Slider value (20-100) is a percentage of this.
-export const PARISH_IDENTITY_LOGO_MAX_WIDTH_BASE = 480;
+// Logo: max 900px = 100% (close to the 1080px canvas minus 80px side padding,
+// so 100% reads as "full-width" like the parish-name lockup in slide 1.jpg).
+// Slider value (20-100) is a percentage of this.
+export const PARISH_IDENTITY_LOGO_MAX_WIDTH_BASE = 900;
 
 // Legacy string presets — backward compat for slides saved before the slider
 const LOGO_PRESET_PCT: Record<SizePreset, number> = {
