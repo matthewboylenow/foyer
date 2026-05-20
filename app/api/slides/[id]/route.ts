@@ -4,6 +4,7 @@ import { slides } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
 import { logAudit } from '@/lib/auth/session';
 import { getDefaultTenant } from '@/lib/db/queries';
+import { diffObjects } from '@/lib/diff';
 
 export async function GET(
   _req: Request,
@@ -27,6 +28,10 @@ export async function PATCH(
   const { id } = await params;
   const body = await req.json();
   const tenant = await getDefaultTenant();
+
+  // Snapshot the existing slide so we can diff its fields vs the update.
+  const existing = await db.query.slides.findFirst({ where: eq(slides.id, id) });
+  if (!existing) return Response.json({ error: 'Not found' }, { status: 404 });
 
   const updateData: Record<string, unknown> = {
     updatedAt: new Date(),
@@ -55,18 +60,33 @@ export async function PATCH(
     .where(eq(slides.id, id))
     .returning();
 
-  if (!updated) return Response.json({ error: 'Not found' }, { status: 404 });
-
   if (tenant) {
-    await logAudit({
-      tenantId: tenant.id,
-      userId: session?.user?.id,
-      userEmail: session?.user?.email ?? undefined,
-      action: 'slide.update',
-      targetType: 'slide',
-      targetId: id,
-      metadata: { fields: Object.keys(updateData) },
-    });
+    // Diff against the snapshot rather than against the requested payload —
+    // catches no-op writes (e.g. PATCH with the same values) and produces
+    // identical metadata regardless of which fields the caller sent.
+    const prev = existing as unknown as Record<string, unknown>;
+    const next = updated as unknown as Record<string, unknown>;
+    // Drop bookkeeping fields from the diff — they always change.
+    const ignore = new Set(['updatedAt', 'updatedBy']);
+    const prevClean = Object.fromEntries(
+      Object.entries(prev).filter(([k]) => !ignore.has(k)),
+    );
+    const nextClean = Object.fromEntries(
+      Object.entries(next).filter(([k]) => !ignore.has(k)),
+    );
+    const changes = diffObjects(prevClean, nextClean);
+
+    if (Object.keys(changes).length > 0) {
+      await logAudit({
+        tenantId: tenant.id,
+        userId: session?.user?.id,
+        userEmail: session?.user?.email ?? undefined,
+        action: 'slide.update',
+        targetType: 'slide',
+        targetId: id,
+        metadata: { changes, title: updated.title },
+      });
+    }
   }
 
   return Response.json(updated);
@@ -84,6 +104,8 @@ export async function DELETE(
   const { id } = await params;
   const tenant = await getDefaultTenant();
 
+  // Snapshot before delete so the audit row carries enough state to recover.
+  const existing = await db.query.slides.findFirst({ where: eq(slides.id, id) });
   await db.delete(slides).where(eq(slides.id, id));
 
   if (tenant) {
@@ -94,6 +116,13 @@ export async function DELETE(
       action: 'slide.delete',
       targetType: 'slide',
       targetId: id,
+      metadata: existing
+        ? {
+            title: existing.title,
+            templateType: existing.templateType,
+            snapshot: existing,
+          }
+        : undefined,
     });
   }
 

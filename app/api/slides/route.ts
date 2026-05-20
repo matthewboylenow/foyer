@@ -63,6 +63,11 @@ export async function POST(req: Request) {
     action: 'slide.create',
     targetType: 'slide',
     targetId: created.id,
+    metadata: {
+      title: created.title,
+      templateType: created.templateType,
+      collectionId: created.collectionId ?? null,
+    },
   });
 
   return Response.json(created, { status: 201 });
