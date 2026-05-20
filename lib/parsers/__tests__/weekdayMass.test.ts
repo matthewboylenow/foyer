@@ -56,4 +56,41 @@ Sat 1/10 - Anniversary of Joseph Long`;
     const result = parseWeekdayMass('MON 1/5 - John');
     expect(result.rows[0].needsReview).toBe(false);
   });
+
+  it('accepts abbreviated month + day (e.g. "May 18")', () => {
+    const result = parseWeekdayMass('May 18 - Marchitelli Family & Jessica Lutkenhouse');
+    expect(result.rows[0]).toMatchObject({
+      timeLabel: 'May 18',
+      intention: 'Marchitelli Family & Jessica Lutkenhouse',
+      needsReview: false,
+    });
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  it('accepts a full week of month + day rows', () => {
+    const input = `May 18 - Marchitelli Family & Jessica Lutkenhouse
+May 19 - McGettigan Family (Deceased Members)
+May 20 - Frank Bernhard
+May 21 - Nicholas Salerno
+May 22 - Terry Vinanskie
+May 23 - People of the Parish`;
+    const result = parseWeekdayMass(input);
+    expect(result.rows).toHaveLength(6);
+    expect(result.warnings).toHaveLength(0);
+    expect(result.rows.every((r) => !r.needsReview)).toBe(true);
+  });
+
+  it('accepts full month names (e.g. "January 5")', () => {
+    const result = parseWeekdayMass('January 5 - Repose of John Smith');
+    expect(result.rows[0]).toMatchObject({
+      timeLabel: 'January 5',
+      intention: 'Repose of John Smith',
+      needsReview: false,
+    });
+  });
+
+  it('accepts month names case-insensitively', () => {
+    const result = parseWeekdayMass('JUN 12 - Anniversary');
+    expect(result.rows[0].needsReview).toBe(false);
+  });
 });

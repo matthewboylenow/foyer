@@ -25,7 +25,7 @@ const PLACEHOLDERS: Record<string, string> = {
   mass_schedule_weekend:
     '5:00 PM - John Smith, requested by the Smith family\n7:00 AM - Mary Brown\n9:00 AM - The Johnson Family\n10:30 AM - Anniversary of the Doe Family\n12:00 PM - For the People of the Parish',
   mass_schedule_weekday:
-    'Mon 1/5 - Repose of John Smith\nTue 1/6 - Mary Brown\nWed 1/7 - Special intention\nThu 1/8 - The Walsh family\nFri 1/9 - In thanksgiving',
+    'May 18 - Marchitelli Family & Jessica Lutkenhouse\nMay 19 - McGettigan Family (Deceased Members)\nMay 20 - Frank Bernhard\nMay 21 - Nicholas Salerno\nMay 22 - Terry Vinanskie\nMay 23 - People of the Parish',
   weekly_association:
     'John Smith\nMary Brown\nThe Johnson Family\nPeter and Anne O\'Sullivan\nJames MacGowan, Sr.',
   sanctuary_candle: 'John Smith',

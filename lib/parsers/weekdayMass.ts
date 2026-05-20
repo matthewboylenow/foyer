@@ -1,12 +1,25 @@
 import type { ParseResult } from './types';
 
-const WEEKDAY_FULL = /^\s*(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+\d{1,2}\/\d{1,2}\s*$/i;
-const WEEKDAY_ABBR = /^\s*(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{1,2}\/\d{1,2}\s*$/i;
+// Pattern variants we accept on the left side of the separator:
+//
+//   Mon 1/5            — abbreviated weekday + M/D
+//   Monday 1/5         — full weekday + M/D
+//   May 18             — month name (abbreviated or full) + day
+//   1/5                — date only (flagged for review)
+//
+const MONTH_NAME =
+  '(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)';
+const WEEKDAY_NAME =
+  '(?:Mon(?:day)?|Tue(?:s(?:day)?)?|Wed(?:nesday)?|Thu(?:rs(?:day)?)?|Fri(?:day)?|Sat(?:urday)?|Sun(?:day)?)';
+
+const WEEKDAY_WITH_DATE = new RegExp(`^\\s*${WEEKDAY_NAME}\\s+\\d{1,2}\\/\\d{1,2}\\s*$`, 'i');
+const MONTH_WITH_DAY = new RegExp(`^\\s*${MONTH_NAME}\\s+\\d{1,2}\\s*$`, 'i');
 const DATE_ONLY = /^\s*\d{1,2}\/\d{1,2}\s*$/;
+
 const SEPARATORS = [' - ', ' – ', ' — ', '\t'];
 
 function normalizeInput(s: string): string {
-  return s.replace(/ /g, ' ').replace(/  +/g, ' ');
+  return s.replace(/ /g, ' ').replace(/  +/g, ' ');
 }
 
 export function parseWeekdayMass(input: string): ParseResult {
@@ -29,7 +42,10 @@ export function parseWeekdayMass(input: string): ParseResult {
       if (idx > 0) {
         const left = line.slice(0, idx).trim();
         const right = line.slice(idx + sep.length).trim();
-        if (WEEKDAY_ABBR.test(left) || WEEKDAY_FULL.test(left)) {
+        if (
+          WEEKDAY_WITH_DATE.test(left) ||
+          MONTH_WITH_DAY.test(left)
+        ) {
           timeLabel = left;
           intention = right;
           break;
@@ -41,7 +57,7 @@ export function parseWeekdayMass(input: string): ParseResult {
           warnings.push({
             lineNumber: i + 1,
             raw: line,
-            reason: 'No weekday name found — please verify date',
+            reason: 'No weekday or month name found — please verify date',
           });
           break;
         }
