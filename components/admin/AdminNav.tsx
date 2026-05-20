@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { signOut } from 'next-auth/react';
 import {
   LayoutGrid,
+  CalendarDays,
   Monitor,
   Activity,
   AlertTriangle,
@@ -24,6 +25,7 @@ import {
 interface NavLink {
   href:
     | '/admin/slides'
+    | '/admin/schedule'
     | '/admin/displays'
     | '/admin/audit'
     | '/admin/errors'
@@ -34,6 +36,7 @@ interface NavLink {
 
 const NAV_LINKS: NavLink[] = [
   { href: '/admin/slides', label: 'Slides', icon: LayoutGrid },
+  { href: '/admin/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/admin/displays', label: 'Displays', icon: Monitor },
   { href: '/admin/audit', label: 'Activity', icon: Activity },
   { href: '/admin/errors', label: 'Errors', icon: AlertTriangle },
