@@ -15,7 +15,9 @@ import { PasteParser } from './PasteParser';
 import { LivePreview } from './LivePreview';
 import { ImageUpload } from './ImageUpload';
 import { SizeButtons } from './SizeButtons';
+import { PercentageSlider } from './PercentageSlider';
 import { RichTextEditor } from './RichTextEditor';
+import { resolveLogoPercent } from '@/components/templates/sizing';
 import { templates } from '@/components/templates';
 import type { TemplateKey } from '@/components/templates';
 import type { SlideWithContent, SlideContent, MassScheduleRow, SizePreset } from '@/lib/db/schema';
@@ -478,10 +480,10 @@ function TemplateFields({
               onSlideLogoChange(null);
             }}
           />
-          <SizeButtons
+          <PercentageSlider
             label="Logo size"
-            value={c.logoSize}
-            onChange={(v: SizePreset) => set('logoSize', v)}
+            value={resolveLogoPercent(c.logoSize)}
+            onChange={(v) => set('logoSize', v)}
           />
         </div>
       );

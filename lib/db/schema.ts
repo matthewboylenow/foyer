@@ -159,7 +159,8 @@ export type SizePreset = 'small' | 'medium' | 'large';
 export type ParishIdentityContent = {
   templateType: 'parish_identity';
   logoMediaId?: string;
-  logoSize?: SizePreset;          // default: 'large' (= original spec size)
+  /** Logo scale 20-100 (percentage of 480px max). Default 100. Legacy: 'small'|'medium'|'large'. */
+  logoSize?: number | SizePreset;
   headline: string;
   headlineSize?: SizePreset;      // default: 'large' (= original spec size)
   subline?: string;                // HTML from RichTextEditor (or plain text)

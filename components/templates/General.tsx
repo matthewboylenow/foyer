@@ -4,6 +4,8 @@ import { motion } from 'motion/react';
 import { LineMask } from '@/components/motion/LineMask';
 import { SplitReveal } from '@/components/motion/SplitReveal';
 import { KenBurns } from '@/components/motion/KenBurns';
+import { BlurIn } from '@/components/motion/BlurIn';
+import { FilmGrain } from '@/components/motion/FilmGrain';
 import { GENERAL_HEADLINE_SIZE, resolveSize } from './sizing';
 import type { GeneralContent } from '@/lib/db/schema';
 
@@ -20,49 +22,72 @@ export function General({ content, bgImageUrl }: GeneralProps) {
     <div className="relative w-full h-full overflow-hidden bg-cream">
       {bgImageUrl && (
         <>
-          <KenBurns src={bgImageUrl} duration={20000} />
-          <div className="absolute inset-0" style={{ background: 'rgba(250,249,247,0.6)' }} />
+          <KenBurns src={bgImageUrl} duration={22000} />
+          {/* Stronger overlay near content area, lighter at edges, for legibility + atmosphere */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(180deg, rgba(250,249,247,0.78) 0%, rgba(250,249,247,0.55) 50%, rgba(250,249,247,0.85) 100%)',
+            }}
+          />
         </>
       )}
 
-      <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.04 }} />
+      {/* Subtle warm accent on the rust meta line zone */}
+      {!bgImageUrl && (
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(ellipse at 0% 40%, rgba(205,83,52,0.05) 0%, transparent 50%)',
+          }}
+        />
+      )}
+
+      <FilmGrain opacity={0.04} />
 
       <div
         className="relative z-10 flex flex-col h-full"
         style={{ padding: '120px 80px' }}
       >
         {/* Headline */}
-        <h2 className="font-serif text-navy leading-tight mb-6" style={{ fontSize: headlinePx }}>
+        <h2
+          className="font-serif text-navy leading-[1.05] mb-6"
+          style={{ fontSize: headlinePx, letterSpacing: '-0.01em' }}
+        >
           {motionStyle === 'splitReveal' ? (
-            <SplitReveal text={headline} delay={0} duration={900} />
+            <SplitReveal text={headline} delay={0} duration={1100} />
           ) : (
-            <LineMask text={headline} delay={0} duration={900} />
+            <LineMask text={headline} delay={0} duration={1000} />
           )}
         </h2>
 
-        {/* Meta line — between headline and body per Matthew's request */}
+        {/* Meta — slides in from the left with a quick blur */}
         {meta && (
-          <motion.p
-            className="font-sans text-rust uppercase tracking-widest mb-10"
-            style={{ fontSize: 28 }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.9 }}
-          >
-            {meta}
-          </motion.p>
+          <BlurIn delay={900} duration={900} y={0} blur={6}>
+            <motion.p
+              className="font-sans text-rust uppercase tracking-widest mb-10 inline-block"
+              style={{ fontSize: 28, paddingLeft: '0.1em' }}
+              initial={{ x: -16 }}
+              animate={{ x: 0 }}
+              transition={{ duration: 0.9, delay: 0.9, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <span className="inline-block w-12 h-px bg-rust align-middle mr-4" />
+              {meta}
+            </motion.p>
+          </BlurIn>
         )}
 
-        {/* Body (rich-text HTML from TipTap, or plain text from existing slides) */}
+        {/* Body (rich-text HTML). Skip if empty after stripping tags. */}
         {body && body.replace(/<[^>]*>/g, '').trim() && (
-          <motion.div
-            className="font-sans text-navy leading-relaxed [&_p]:m-0 [&_p+p]:mt-4 [&_ul]:list-disc [&_ul]:pl-8 [&_li]:mt-1 [&_strong]:font-semibold [&_em]:italic"
-            style={{ fontSize: 48 }}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 1.3 }}
-            dangerouslySetInnerHTML={{ __html: body }}
-          />
+          <BlurIn delay={1500} duration={1100} y={10} blur={8}>
+            <div
+              className="font-sans text-navy leading-relaxed [&_p]:m-0 [&_p+p]:mt-4 [&_ul]:list-disc [&_ul]:pl-8 [&_li]:mt-1 [&_strong]:font-semibold [&_em]:italic"
+              style={{ fontSize: 48 }}
+              dangerouslySetInnerHTML={{ __html: body }}
+            />
+          </BlurIn>
         )}
       </div>
     </div>

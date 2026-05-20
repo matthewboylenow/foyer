@@ -5,11 +5,29 @@ import type { SizePreset } from '@/lib/db/schema';
 // Default is 'large' so existing slides + new slides without a chosen size
 // render at the original/spec size.
 
-export const PARISH_IDENTITY_LOGO_MAX_WIDTH: Record<SizePreset, number> = {
-  small: 280,
-  medium: 380,
-  large: 480, // original
+// Logo: max 480px = 100%. Slider value (20-100) is a percentage of this.
+export const PARISH_IDENTITY_LOGO_MAX_WIDTH_BASE = 480;
+
+// Legacy string presets — backward compat for slides saved before the slider
+const LOGO_PRESET_PCT: Record<SizePreset, number> = {
+  small: 60,
+  medium: 80,
+  large: 100,
 };
+
+export function resolveLogoPercent(value: number | SizePreset | undefined): number {
+  if (typeof value === 'number') {
+    return Math.max(20, Math.min(100, value));
+  }
+  if (value && value in LOGO_PRESET_PCT) {
+    return LOGO_PRESET_PCT[value as SizePreset];
+  }
+  return 100;
+}
+
+export function resolveLogoWidth(value: number | SizePreset | undefined): number {
+  return PARISH_IDENTITY_LOGO_MAX_WIDTH_BASE * (resolveLogoPercent(value) / 100);
+}
 
 export const PARISH_IDENTITY_HEADLINE_SIZE: Record<SizePreset, number> = {
   small: 56,
