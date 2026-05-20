@@ -1,50 +1,29 @@
-'use client';
-
-import { motion } from 'motion/react';
 import Image from 'next/image';
-
-interface KenBurnsStart {
-  scale: number;
-  x?: number;
-  y?: number;
-}
 
 interface KenBurnsProps {
   src: string;
   alt?: string;
+  /** Cycle length in ms. The animation alternates, so half this is one direction. */
   duration?: number;
-  start?: KenBurnsStart;
-  end?: KenBurnsStart;
   className?: string;
 }
 
-export function KenBurns({
-  src,
-  alt = '',
-  duration = 20000,
-  start = { scale: 1.0, x: 0, y: 0 },
-  end = { scale: 1.08, x: -1, y: -1 },
-  className,
-}: KenBurnsProps) {
+/**
+ * Slow alternating zoom over a background image. Pure CSS so it runs on
+ * the compositor and respects `animation-play-state: paused` — which is
+ * how SlideFrame freezes outgoing-slide motion during transitions.
+ *
+ * The actual keyframe lives in `app/globals.css` (`@keyframes ken-burns`).
+ */
+export function KenBurns({ src, alt = '', duration = 20000, className }: KenBurnsProps) {
   return (
-    <motion.div
-      className={`absolute inset-0 overflow-hidden ${className ?? ''}`}
-      initial={{ scale: start.scale, x: `${start.x ?? 0}%`, y: `${start.y ?? 0}%` }}
-      animate={{ scale: end.scale, x: `${end.x ?? 0}%`, y: `${end.y ?? 0}%` }}
-      transition={{
-        duration: duration / 1000,
-        repeat: Infinity,
-        repeatType: 'reverse',
-        ease: 'linear',
-      }}
-    >
-      <Image
-        src={src}
-        alt={alt}
-        fill
-        className="object-cover"
-        priority
-      />
-    </motion.div>
+    <div className={`absolute inset-0 overflow-hidden ${className ?? ''}`}>
+      <div
+        className="ken-burns-anim absolute inset-0"
+        style={{ animationDuration: `${duration}ms` }}
+      >
+        <Image src={src} alt={alt} fill className="object-cover" priority />
+      </div>
+    </div>
   );
 }

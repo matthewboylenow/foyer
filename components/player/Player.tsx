@@ -121,13 +121,28 @@ export function Player({ displayId }: PlayerProps) {
     return () => clearInterval(interval);
   }, [displayId, slides, ready]);
 
-  // Pre-load next slide's background image
+  // Pre-decode the next slide's media during the current slide's hold so
+  // image decode never blocks the cross-dissolve. Without this, the new
+  // template mounts and Image decode hitches the GPU exactly when the
+  // transition is supposed to be smooth — the "bloated cut" feeling.
   useEffect(() => {
     if (pool.length === 0) return;
     const next = pool[(currentIndex + 1) % pool.length];
-    const content = next?.content;
-    if (content && 'bgImageMediaId' in content && content.bgImageMediaId) {
-      // Pre-fetch would use the blob URL resolved server-side; handled by the API
+    const urls = [
+      next?.resolvedMedia?.bgImageUrl,
+      next?.resolvedMedia?.logoUrl,
+      next?.resolvedMedia?.phoneMockupUrl,
+    ].filter((u): u is string => Boolean(u));
+
+    for (const url of urls) {
+      const img = new window.Image();
+      img.src = url;
+      // Hint to the browser to decode off the main thread when supported.
+      if (typeof img.decode === 'function') {
+        img.decode().catch(() => {
+          // Decode can reject if the resource is replaced — safe to ignore.
+        });
+      }
     }
   }, [currentIndex, pool]);
 

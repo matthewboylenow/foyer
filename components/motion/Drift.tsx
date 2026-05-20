@@ -1,23 +1,24 @@
-'use client';
-
-import { motion } from 'motion/react';
+import type { CSSProperties } from 'react';
 
 interface DriftProps {
   children: React.ReactNode;
-  /** Duration of one full cycle in ms (default 8s = slow, organic) */
+  /** Duration of one full cycle in ms (default 8s) */
   duration?: number;
-  /** Vertical range in px (default 8 = subtle) */
+  /** Vertical range in px (default 8) */
   y?: number;
   /** Horizontal range in px (default 0) */
   x?: number;
-  /** Scale variation (default 0 = no scale breathing) — try 0.01 for subtle breathing */
+  /** Scale variation (default 0 = no breathing) */
   scale?: number;
   className?: string;
 }
 
 /**
- * Continuous ambient motion — slow figure-8 / floating drift.
- * Use sparingly on hero elements that should feel alive during the hold phase.
+ * Continuous ambient drift. Pure CSS — uses custom properties as
+ * keyframe inputs so amplitude and duration are per-instance while the
+ * keyframe itself is shared. Pauses on outgoing slides.
+ *
+ * Keyframe lives in `app/globals.css` (`@keyframes drift-float`).
  */
 export function Drift({
   children,
@@ -27,22 +28,16 @@ export function Drift({
   scale = 0,
   className,
 }: DriftProps) {
-  const d = duration / 1000;
+  const style = {
+    animationDuration: `${duration}ms`,
+    '--drift-x': `${x}px`,
+    '--drift-y': `${y}px`,
+    '--drift-scale': scale,
+  } as CSSProperties;
+
   return (
-    <motion.div
-      className={className}
-      animate={{
-        y: y ? [0, -y, 0, y, 0] : 0,
-        x: x ? [0, x, 0, -x, 0] : 0,
-        scale: scale ? [1, 1 + scale, 1, 1 - scale * 0.5, 1] : 1,
-      }}
-      transition={{
-        duration: d,
-        repeat: Infinity,
-        ease: 'easeInOut',
-      }}
-    >
+    <div className={`drift-anim ${className ?? ''}`} style={style}>
       {children}
-    </motion.div>
+    </div>
   );
 }

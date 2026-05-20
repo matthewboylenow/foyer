@@ -192,3 +192,61 @@
   animation: word-stagger-rise 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: opacity, transform;
 }
+
+/* ─── Ambient slide-motion primitives (pure CSS — see components/motion/*) ───
+   These were framer-motion JS rAF loops; converted to CSS so the compositor
+   handles them and so SlideFrame can pause them on outgoing slides via
+   `[data-exiting]` (one fewer template animating during transition). */
+
+@keyframes ken-burns {
+  from {
+    transform: scale(1) translate(0, 0);
+  }
+  to {
+    transform: scale(1.08) translate(-1%, -1%);
+  }
+}
+.ken-burns-anim {
+  animation-name: ken-burns;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  animation-timing-function: linear;
+  will-change: transform;
+}
+
+@keyframes glow-pulse {
+  0%   { opacity: 0.7; }
+  25%  { opacity: 1; }
+  50%  { opacity: 0.85; }
+  75%  { opacity: 1; }
+  100% { opacity: 0.7; }
+}
+.glow-pulse-anim {
+  animation-name: glow-pulse;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+  will-change: opacity;
+}
+
+@keyframes drift-float {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  25%  { transform: translate3d(var(--drift-x, 0px), calc(-1 * var(--drift-y, 0px)), 0) scale(calc(1 + var(--drift-scale, 0))); }
+  50%  { transform: translate3d(0, 0, 0) scale(1); }
+  75%  { transform: translate3d(calc(-1 * var(--drift-x, 0px)), var(--drift-y, 0px), 0) scale(calc(1 - var(--drift-scale, 0) * 0.5)); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+.drift-anim {
+  animation-name: drift-float;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+  will-change: transform;
+}
+
+/* When SlideFrame marks the outgoing layer with data-exiting, pause every
+   ambient animation on it so the compositor only handles the cross-dissolve. */
+[data-exiting="true"] .ken-burns-anim,
+[data-exiting="true"] .glow-pulse-anim,
+[data-exiting="true"] .drift-anim,
+[data-exiting="true"] .word-stagger {
+  animation-play-state: paused;
+}
