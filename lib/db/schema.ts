@@ -159,11 +159,15 @@ export type SizePreset = 'small' | 'medium' | 'large';
 export type ParishIdentityContent = {
   templateType: 'parish_identity';
   logoMediaId?: string;
-  /** Logo scale 20-100 (percentage of 480px max). Default 100. Legacy: 'small'|'medium'|'large'. */
+  /** Logo scale 20-100 (percentage of 900px max). Default 100. Legacy: 'small'|'medium'|'large'. */
   logoSize?: number | SizePreset;
   headline: string;
   headlineSize?: SizePreset;      // default: 'large' (= original spec size)
   subline?: string;                // HTML from RichTextEditor (or plain text)
+  /** Optional background image (Ken Burns). Falls back to gradient if not set. */
+  bgImageMediaId?: string;
+  /** Optional looping muted background video. Takes precedence over bgImage if both set. */
+  bgVideoMediaId?: string;
 };
 
 export type WelcomeQuoteContent = {
@@ -188,10 +192,20 @@ export type MassScheduleRow = {
   intention: string;
 };
 
+/**
+ * Mass Intentions: combines weekend + daily on a single slide.
+ * Legacy fields (`scheduleKind` + `rows`) retained for backward-compat
+ * with slides created before the combined layout.
+ */
 export type MassScheduleContent = {
   templateType: 'mass_schedule';
-  scheduleKind: 'weekend' | 'weekday';
-  rows: MassScheduleRow[];
+  /** Optional dated label, e.g. "Weekend of May 16 / 17" */
+  weekendLabel?: string;
+  weekendRows?: MassScheduleRow[];
+  weekdayRows?: MassScheduleRow[];
+  // Legacy single-section format:
+  scheduleKind?: 'weekend' | 'weekday';
+  rows?: MassScheduleRow[];
 };
 
 export type WeeklyAssociationContent = {

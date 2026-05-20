@@ -14,6 +14,7 @@ import { TimePicker } from './TimePicker';
 import { PasteParser } from './PasteParser';
 import { LivePreview } from './LivePreview';
 import { ImageUpload } from './ImageUpload';
+import { VideoUpload } from './VideoUpload';
 import { SizeButtons } from './SizeButtons';
 import { PercentageSlider } from './PercentageSlider';
 import { RichTextEditor } from './RichTextEditor';
@@ -31,6 +32,7 @@ interface SlideEditorProps {
   initialMedia?: {
     logoUrl?: string | null;
     bgImageUrl?: string | null;
+    bgVideoUrl?: string | null;
     phoneMockupUrl?: string | null;
   };
 }
@@ -91,6 +93,7 @@ export function SlideEditor({
   const [savedState, setSavedState] = useState<'idle' | 'saved' | 'error'>('idle');
   // Track resolved media URLs for live preview (not persisted — looked up server-side from IDs)
   const [bgImageUrl, setBgImageUrl] = useState<string | null>(initialMedia?.bgImageUrl ?? null);
+  const [bgVideoUrl, setBgVideoUrl] = useState<string | null>(initialMedia?.bgVideoUrl ?? null);
   const [phoneMockupUrl, setPhoneMockupUrl] = useState<string | null>(initialMedia?.phoneMockupUrl ?? null);
   const [slideLogoUrl, setSlideLogoUrl] = useState<string | null>(initialMedia?.logoUrl ?? null);
 
@@ -226,6 +229,8 @@ export function SlideEditor({
             onChange={(c) => setContent(c)}
             bgImageUrl={bgImageUrl}
             onBgImageChange={setBgImageUrl}
+            bgVideoUrl={bgVideoUrl}
+            onBgVideoChange={setBgVideoUrl}
             phoneMockupUrl={phoneMockupUrl}
             onPhoneMockupChange={setPhoneMockupUrl}
             slideLogoUrl={slideLogoUrl}
@@ -255,6 +260,7 @@ export function SlideEditor({
               content={content}
               logoUrl={slideLogoUrl ?? tenantLogoUrl ?? null}
               bgImageUrl={bgImageUrl}
+              bgVideoUrl={bgVideoUrl}
               phoneMockupUrl={phoneMockupUrl}
               width={280}
             />
@@ -416,6 +422,8 @@ interface TemplateFieldsProps {
   onChange: (c: SlideContent) => void;
   bgImageUrl: string | null;
   onBgImageChange: (url: string | null) => void;
+  bgVideoUrl: string | null;
+  onBgVideoChange: (url: string | null) => void;
   phoneMockupUrl: string | null;
   onPhoneMockupChange: (url: string | null) => void;
   slideLogoUrl: string | null;
@@ -428,6 +436,8 @@ function TemplateFields({
   onChange,
   bgImageUrl,
   onBgImageChange,
+  bgVideoUrl,
+  onBgVideoChange,
   phoneMockupUrl,
   onPhoneMockupChange,
   slideLogoUrl,
@@ -485,6 +495,40 @@ function TemplateFields({
             value={resolveLogoPercent(c.logoSize)}
             onChange={(v) => set('logoSize', v)}
           />
+
+          {/* Background media */}
+          <div className="pt-4 border-t border-border space-y-3">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">Background</p>
+            <p className="text-xs text-muted-foreground">
+              Optional. Video takes precedence if both are set. Falls back to the animated
+              navy gradient when no media is uploaded.
+            </p>
+            <ImageUpload
+              label="Background image"
+              type="image"
+              currentUrl={bgImageUrl}
+              onUploaded={({ id, blobUrl }) => {
+                set('bgImageMediaId', id);
+                onBgImageChange(blobUrl);
+              }}
+              onCleared={() => {
+                set('bgImageMediaId', undefined);
+                onBgImageChange(null);
+              }}
+            />
+            <VideoUpload
+              label="Background video (loops, muted)"
+              currentUrl={bgVideoUrl}
+              onUploaded={({ id, blobUrl }) => {
+                set('bgVideoMediaId', id);
+                onBgVideoChange(blobUrl);
+              }}
+              onCleared={() => {
+                set('bgVideoMediaId', undefined);
+                onBgVideoChange(null);
+              }}
+            />
+          </div>
         </div>
       );
     }
@@ -570,29 +614,57 @@ function TemplateFields({
 
     case 'mass_schedule': {
       const c = content as Extract<SlideContent, { templateType: 'mass_schedule' }>;
+      // Normalize legacy single-section data into the dual-section editor view
+      const initialWeekendRows: MassScheduleRow[] =
+        c.weekendRows ?? (c.scheduleKind === 'weekend' ? (c.rows ?? []) : []);
+      const initialWeekdayRows: MassScheduleRow[] =
+        c.weekdayRows ?? (c.scheduleKind === 'weekday' ? (c.rows ?? []) : []);
+
       return (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div className="space-y-1">
-            <Label>Schedule type</Label>
-            <div className="flex gap-4">
-              {(['weekend', 'weekday'] as const).map((k) => (
-                <label key={k} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={c.scheduleKind === k}
-                    onChange={() => set('scheduleKind', k)}
-                    className="accent-rust"
-                  />
-                  <span className="text-sm capitalize">{k}</span>
-                </label>
-              ))}
-            </div>
+            <Label>Weekend dates label (optional)</Label>
+            <Input
+              value={c.weekendLabel ?? ''}
+              onChange={(e) => set('weekendLabel', e.target.value)}
+              placeholder="e.g. Weekend of May 16 / 17"
+            />
+            <p className="text-xs text-muted-foreground">
+              Leave blank to show &ldquo;This Weekend&rsquo;s Masses&rdquo;.
+            </p>
           </div>
-          <PasteParser
-            templateType={c.scheduleKind === 'weekend' ? 'mass_schedule_weekend' : 'mass_schedule_weekday'}
-            savedRows={c.rows.map((r) => ({ ...r, needsReview: false }))}
-            onParsed={(rows) => set('rows', rows.map(({ needsReview: _, ...r }) => r) as MassScheduleRow[])}
-          />
+
+          <div className="space-y-2 pt-2 border-t border-border">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground pt-2">
+              Weekend Masses
+            </p>
+            <PasteParser
+              templateType="mass_schedule_weekend"
+              savedRows={initialWeekendRows.map((r) => ({ ...r, needsReview: false }))}
+              onParsed={(rows) =>
+                set(
+                  'weekendRows',
+                  rows.map(({ needsReview: _ignored, ...r }) => r) as MassScheduleRow[],
+                )
+              }
+            />
+          </div>
+
+          <div className="space-y-2 pt-4 border-t border-border">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground pt-2">
+              Daily Mass Intentions
+            </p>
+            <PasteParser
+              templateType="mass_schedule_weekday"
+              savedRows={initialWeekdayRows.map((r) => ({ ...r, needsReview: false }))}
+              onParsed={(rows) =>
+                set(
+                  'weekdayRows',
+                  rows.map(({ needsReview: _ignored, ...r }) => r) as MassScheduleRow[],
+                )
+              }
+            />
+          </div>
         </div>
       );
     }

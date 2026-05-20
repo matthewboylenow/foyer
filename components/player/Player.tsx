@@ -207,6 +207,7 @@ export function Player({ displayId }: PlayerProps) {
           content={current.content}
           logoUrl={resolved.logoUrl}
           bgImageUrl={resolved.bgImageUrl}
+          bgVideoUrl={resolved.bgVideoUrl}
           phoneMockupUrl={resolved.phoneMockupUrl}
         />
       </SlideFrame>

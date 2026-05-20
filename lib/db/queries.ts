@@ -47,6 +47,7 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
     const c = s.content as Record<string, unknown>;
     if (typeof c?.logoMediaId === 'string') mediaIds.add(c.logoMediaId);
     if (typeof c?.bgImageMediaId === 'string') mediaIds.add(c.bgImageMediaId);
+    if (typeof c?.bgVideoMediaId === 'string') mediaIds.add(c.bgVideoMediaId);
     if (typeof c?.phoneMockupMediaId === 'string') mediaIds.add(c.phoneMockupMediaId);
   }
 
@@ -70,6 +71,10 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
     if (typeof c?.bgImageMediaId === 'string') {
       const url = mediaMap.get(c.bgImageMediaId);
       if (url) resolved.bgImageUrl = url;
+    }
+    if (typeof c?.bgVideoMediaId === 'string') {
+      const url = mediaMap.get(c.bgVideoMediaId);
+      if (url) resolved.bgVideoUrl = url;
     }
     if (typeof c?.phoneMockupMediaId === 'string') {
       const url = mediaMap.get(c.phoneMockupMediaId);

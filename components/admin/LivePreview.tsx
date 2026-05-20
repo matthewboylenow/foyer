@@ -10,6 +10,7 @@ interface LivePreviewProps {
   content: SlideContent;
   logoUrl?: string | null;
   bgImageUrl?: string | null;
+  bgVideoUrl?: string | null;
   phoneMockupUrl?: string | null;
   /** Preview pixel width (height auto-scales to 16:9 vertical = 1080×1920) */
   width?: number;
@@ -20,6 +21,7 @@ export function LivePreview({
   content,
   logoUrl,
   bgImageUrl,
+  bgVideoUrl,
   phoneMockupUrl,
   width = 280,
 }: LivePreviewProps) {
@@ -68,6 +70,7 @@ export function LivePreview({
           content={debouncedContent}
           logoUrl={logoUrl ?? undefined}
           bgImageUrl={bgImageUrl ?? undefined}
+          bgVideoUrl={bgVideoUrl ?? undefined}
           phoneMockupUrl={phoneMockupUrl ?? undefined}
         />
       </div>

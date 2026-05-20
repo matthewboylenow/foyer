@@ -28,10 +28,11 @@ export default async function EditSlidePage({
   const ids: Record<string, string | null> = {
     logo: typeof content?.logoMediaId === 'string' ? content.logoMediaId : null,
     bg: typeof content?.bgImageMediaId === 'string' ? content.bgImageMediaId : null,
+    bgVideo: typeof content?.bgVideoMediaId === 'string' ? content.bgVideoMediaId : null,
     phone: typeof content?.phoneMockupMediaId === 'string' ? content.phoneMockupMediaId : null,
   };
 
-  const resolved: Record<string, string | null> = { logo: null, bg: null, phone: null };
+  const resolved: Record<string, string | null> = { logo: null, bg: null, bgVideo: null, phone: null };
   for (const [k, mid] of Object.entries(ids)) {
     if (!mid) continue;
     const m = await getMediaById(mid);
@@ -47,6 +48,7 @@ export default async function EditSlidePage({
       initialMedia={{
         logoUrl: resolved.logo,
         bgImageUrl: resolved.bg,
+        bgVideoUrl: resolved.bgVideo,
         phoneMockupUrl: resolved.phone,
       }}
     />

@@ -33,6 +33,7 @@ export default async function PreviewPage({
   const content = slide.content as Record<string, unknown>;
   let logoUrl: string | null = null;
   let bgImageUrl: string | null = null;
+  let bgVideoUrl: string | null = null;
   let phoneMockupUrl: string | null = null;
 
   if (slide.templateType === 'parish_identity') {
@@ -48,6 +49,10 @@ export default async function PreviewPage({
     const m = await getMediaById(content.bgImageMediaId);
     bgImageUrl = m?.blobUrl ?? null;
   }
+  if (typeof content?.bgVideoMediaId === 'string') {
+    const m = await getMediaById(content.bgVideoMediaId);
+    bgVideoUrl = m?.blobUrl ?? null;
+  }
   if (typeof content?.phoneMockupMediaId === 'string') {
     const m = await getMediaById(content.phoneMockupMediaId);
     phoneMockupUrl = m?.blobUrl ?? null;
@@ -62,6 +67,7 @@ export default async function PreviewPage({
         content={slide.content as SlideWithContent['content']}
         logoUrl={logoUrl ?? undefined}
         bgImageUrl={bgImageUrl ?? undefined}
+        bgVideoUrl={bgVideoUrl ?? undefined}
         phoneMockupUrl={phoneMockupUrl ?? undefined}
       />
     </div>

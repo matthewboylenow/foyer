@@ -32,10 +32,10 @@ export const templates = {
   },
   mass_schedule: {
     component: MassSchedule,
-    defaultDurationSec: 20,
+    defaultDurationSec: 22,
     defaultWeight: 1.5,
-    label: 'Mass Schedule',
-    description: 'Weekend or weekday Mass times with intentions. Paste-to-parse.',
+    label: 'Mass Intentions',
+    description: 'Weekend and daily Mass times + intentions on one slide. Paste-to-parse.',
   },
   weekly_association: {
     component: WeeklyAssociation,
