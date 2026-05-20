@@ -159,23 +159,23 @@ export type SizePreset = 'small' | 'medium' | 'large';
 export type ParishIdentityContent = {
   templateType: 'parish_identity';
   logoMediaId?: string;
-  logoSize?: SizePreset;          // default: 'medium'
+  logoSize?: SizePreset;          // default: 'large' (= original spec size)
   headline: string;
-  headlineSize?: SizePreset;      // default: 'medium'
+  headlineSize?: SizePreset;      // default: 'large' (= original spec size)
   subline?: string;                // HTML from RichTextEditor (or plain text)
 };
 
 export type WelcomeQuoteContent = {
   templateType: 'welcome_quote';
   quote: string;
-  quoteSize?: SizePreset;          // default: 'medium'
+  quoteSize?: SizePreset;          // default: 'large' (= original spec size)
   attribution?: string;
 };
 
 export type GeneralContent = {
   templateType: 'general';
   headline: string;
-  headlineSize?: SizePreset;       // default: 'medium'
+  headlineSize?: SizePreset;       // default: 'large' (= original spec size)
   body: string;                     // HTML from RichTextEditor
   meta?: string;
   bgImageMediaId?: string;
@@ -201,14 +201,14 @@ export type WeeklyAssociationContent = {
 export type SanctuaryCandleContent = {
   templateType: 'sanctuary_candle';
   name: string;
-  nameSize?: SizePreset;           // default: 'medium'
+  nameSize?: SizePreset;           // default: 'large' (= original spec size)
   inMemoryOf?: boolean;
 };
 
 export type AppPromoContent = {
   templateType: 'app_promo';
   headline: string;
-  headlineSize?: SizePreset;       // default: 'medium'
+  headlineSize?: SizePreset;       // default: 'large' (= original spec size)
   body: string;
   url: string;
   phoneMockupMediaId?: string;

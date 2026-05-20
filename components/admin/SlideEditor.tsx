@@ -25,6 +25,7 @@ interface SlideEditorProps {
   templateType: TemplateKey;
   initialSlide: SlideWithContent | null;
   tenantLogoUrl?: string | null;
+  displays?: { id: string; name: string }[];
   initialMedia?: {
     logoUrl?: string | null;
     bgImageUrl?: string | null;
@@ -51,7 +52,13 @@ function defaultContent(templateType: TemplateKey): SlideContent {
   }
 }
 
-export function SlideEditor({ templateType, initialSlide, tenantLogoUrl, initialMedia }: SlideEditorProps) {
+export function SlideEditor({
+  templateType,
+  initialSlide,
+  tenantLogoUrl,
+  displays = [],
+  initialMedia,
+}: SlideEditorProps) {
   const router = useRouter();
   const isNew = !initialSlide;
 
@@ -75,6 +82,9 @@ export function SlideEditor({ templateType, initialSlide, tenantLogoUrl, initial
     initialSlide?.durationOverrideSec ? String(initialSlide.durationOverrideSec) : '',
   );
   const [active, setActive] = useState(initialSlide?.active ?? true);
+  const [targetDisplays, setTargetDisplays] = useState<string[]>(
+    (initialSlide?.targetDisplays as string[]) ?? [],
+  );
   const [saving, setSaving] = useState(false);
   const [savedState, setSavedState] = useState<'idle' | 'saved' | 'error'>('idle');
   // Track resolved media URLs for live preview (not persisted — looked up server-side from IDs)
@@ -93,6 +103,7 @@ export function SlideEditor({ templateType, initialSlide, tenantLogoUrl, initial
       active,
       weight: parseFloat(weight) || 1,
       durationOverrideSec: durationOverride ? parseInt(durationOverride) : null,
+      targetDisplays,
     };
 
     if (scheduleType === 'dated') {
@@ -349,6 +360,45 @@ export function SlideEditor({ templateType, initialSlide, tenantLogoUrl, initial
               />
             </div>
           </div>
+
+          {/* Per-display targeting */}
+          {displays.length > 0 && (
+            <div className="p-4 border border-border rounded-lg space-y-3">
+              <h3 className="font-medium text-sm">Displays</h3>
+              <p className="text-xs text-muted-foreground">
+                Leave all unchecked to show on every display.
+              </p>
+              <div className="space-y-2">
+                {displays.map((d) => {
+                  const checked = targetDisplays.includes(d.id);
+                  return (
+                    <label key={d.id} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setTargetDisplays((prev) =>
+                            checked ? prev.filter((id) => id !== d.id) : [...prev, d.id],
+                          );
+                        }}
+                        className="accent-rust w-4 h-4"
+                      />
+                      <span className="text-sm">{d.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              {targetDisplays.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setTargetDisplays([])}
+                  className="text-xs text-rust underline"
+                >
+                  Clear (show on all displays)
+                </button>
+              )}
+            </div>
+          )}
 
         </div>
       </div>

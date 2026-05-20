@@ -15,6 +15,7 @@ import {
 const NAV_LINKS = [
   { href: '/admin/slides', label: 'Slides' },
   { href: '/admin/displays', label: 'Displays' },
+  { href: '/admin/audit', label: 'Activity' },
   { href: '/admin/settings', label: 'Settings' },
 ];
 

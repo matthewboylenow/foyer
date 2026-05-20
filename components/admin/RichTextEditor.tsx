@@ -2,6 +2,7 @@
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
 import { useEffect } from 'react';
 import { Bold, Italic, List } from 'lucide-react';
 
@@ -32,10 +33,11 @@ export function RichTextEditor({
         codeBlock: false,
         blockquote: false,
         horizontalRule: false,
-        // Drop bulletList from minimal toolbar
         bulletList: toolbar === 'full' ? undefined : false,
         orderedList: false,
-        // Hard break via Shift+Enter (StarterKit default)
+      }),
+      Placeholder.configure({
+        placeholder: placeholder ?? '',
       }),
     ],
     content: value || '',
@@ -44,18 +46,16 @@ export function RichTextEditor({
     },
     editorProps: {
       attributes: {
-        class: 'outline-none prose prose-sm max-w-none focus:outline-none',
+        class: 'outline-none prose prose-sm max-w-none focus:outline-none rich-editor',
         style: `min-height: ${rows * 24}px`,
       },
     },
-    immediatelyRender: false, // avoid SSR hydration mismatch
+    immediatelyRender: false,
   });
 
-  // Keep editor in sync when the value prop changes externally (e.g. initial load)
   useEffect(() => {
     if (!editor) return;
     const current = editor.getHTML();
-    // Only update if meaningfully different — avoid cursor jumps on every onChange
     if ((value || '') !== current && (value || '<p></p>') !== current) {
       editor.commands.setContent(value || '', { emitUpdate: false });
     }
@@ -63,7 +63,10 @@ export function RichTextEditor({
 
   if (!editor) {
     return (
-      <div className="border border-input rounded-md px-3 py-2 text-sm text-muted-foreground" style={{ minHeight: rows * 24 + 16 }}>
+      <div
+        className="border border-input rounded-md px-3 py-2 text-sm text-muted-foreground"
+        style={{ minHeight: rows * 24 + 16 }}
+      >
         Loading editor…
       </div>
     );
@@ -102,14 +105,6 @@ export function RichTextEditor({
         </div>
       )}
       <EditorContent editor={editor} className="px-3 py-2" />
-      {!value && placeholder && (
-        <div
-          className="px-3 py-2 text-sm text-muted-foreground pointer-events-none -mt-[calc(100%-1px)]"
-          style={{ display: editor.isFocused ? 'none' : 'block' }}
-        >
-          {/* Simple placeholder fallback — TipTap's placeholder extension would be more robust */}
-        </div>
-      )}
     </div>
   );
 }

@@ -20,6 +20,7 @@
     "@base-ui/react": "^1.5.0",
     "@hookform/resolvers": "^5.2.2",
     "@neondatabase/serverless": "^1.1.0",
+    "@tiptap/extension-placeholder": "^3.23.5",
     "@tiptap/react": "^3.23.5",
     "@tiptap/starter-kit": "^3.23.5",
     "@vercel/blob": "^2.4.0",

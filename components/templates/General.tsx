@@ -54,14 +54,16 @@ export function General({ content, bgImageUrl }: GeneralProps) {
         )}
 
         {/* Body (rich-text HTML from TipTap, or plain text from existing slides) */}
-        <motion.div
-          className="font-sans text-navy leading-relaxed [&_p]:m-0 [&_p+p]:mt-4 [&_ul]:list-disc [&_ul]:pl-8 [&_li]:mt-1 [&_strong]:font-semibold [&_em]:italic"
-          style={{ fontSize: 48 }}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 1.3 }}
-          dangerouslySetInnerHTML={{ __html: body || '' }}
-        />
+        {body && body.replace(/<[^>]*>/g, '').trim() && (
+          <motion.div
+            className="font-sans text-navy leading-relaxed [&_p]:m-0 [&_p+p]:mt-4 [&_ul]:list-disc [&_ul]:pl-8 [&_li]:mt-1 [&_strong]:font-semibold [&_em]:italic"
+            style={{ fontSize: 48 }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 1.3 }}
+            dangerouslySetInnerHTML={{ __html: body }}
+          />
+        )}
       </div>
     </div>
   );

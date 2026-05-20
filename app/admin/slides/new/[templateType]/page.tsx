@@ -1,7 +1,11 @@
 import { notFound } from 'next/navigation';
 import { templates } from '@/components/templates';
 import { SlideEditor } from '@/components/admin/SlideEditor';
-import { getDefaultTenant, getSettingsWithMedia } from '@/lib/db/queries';
+import {
+  getDefaultTenant,
+  getSettingsWithMedia,
+  getDisplaysByTenant,
+} from '@/lib/db/queries';
 import type { TemplateKey } from '@/components/templates';
 
 export default async function NewSlideByTemplatePage({
@@ -15,12 +19,14 @@ export default async function NewSlideByTemplatePage({
   const tenant = await getDefaultTenant();
   const settings = tenant ? await getSettingsWithMedia(tenant.id) : null;
   const tenantLogoUrl = settings?.logoMedia?.blobUrl ?? null;
+  const displays = tenant ? await getDisplaysByTenant(tenant.id) : [];
 
   return (
     <SlideEditor
       templateType={templateType as TemplateKey}
       initialSlide={null}
       tenantLogoUrl={tenantLogoUrl}
+      displays={displays.map((d) => ({ id: d.id, name: d.name }))}
     />
   );
 }

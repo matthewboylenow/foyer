@@ -1,6 +1,6 @@
 import { eq, and, or, isNull, lte, gte, desc } from 'drizzle-orm';
 import { db } from './client';
-import { slides, displays, settings, tenants } from './schema';
+import { slides, displays, settings, tenants, auditLog } from './schema';
 import type { SlideWithContent } from './schema';
 
 export type EligibleSlide = SlideWithContent & {
@@ -134,4 +134,20 @@ export async function getTenantBySlug(slug: string) {
 
 export async function getDefaultTenant() {
   return db.query.tenants.findFirst();
+}
+
+export async function getRecentAuditLog(tenantId: string, limit = 100) {
+  return db.query.auditLog.findMany({
+    where: eq(auditLog.tenantId, tenantId),
+    orderBy: [desc(auditLog.createdAt)],
+    limit,
+  });
+}
+
+export async function getSlideTitles(tenantId: string) {
+  const rows = await db.query.slides.findMany({
+    where: eq(slides.tenantId, tenantId),
+    columns: { id: true, title: true, templateType: true },
+  });
+  return Object.fromEntries(rows.map((r) => [r.id, { title: r.title, templateType: r.templateType }]));
 }

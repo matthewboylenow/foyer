@@ -162,3 +162,12 @@
     @apply font-sans;
   }
 }
+
+/* TipTap placeholder — shows empty-state hint inside the rich editor */
+.rich-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--muted-foreground);
+  pointer-events: none;
+  height: 0;
+}

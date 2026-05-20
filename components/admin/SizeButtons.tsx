@@ -12,7 +12,7 @@ interface SizeButtonsProps {
 }
 
 export function SizeButtons({ label, value, onChange }: SizeButtonsProps) {
-  const current = value ?? 'medium';
+  const current = value ?? 'large';
   return (
     <div className="space-y-1">
       <Label className="text-xs">{label}</Label>
