@@ -8,7 +8,9 @@ import type { WeeklyAssociationContent } from '@/lib/db/schema';
 export function WeeklyAssociation({ content }: { content: WeeklyAssociationContent }) {
   const { names } = content;
   const twoColumns = names.length > 6;
-  const fontSize = names.length > 9 ? Math.max(48, 64 - (names.length - 9) * 4) : 64;
+  // Baseline 44px (down from 64) so names read in line with the rest of the
+  // templates rather than dominating the canvas. Auto-scale down for long lists.
+  const fontSize = names.length > 7 ? Math.max(32, 44 - (names.length - 7) * 2) : 44;
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-cream">

@@ -55,10 +55,12 @@ export const APP_PROMO_HEADLINE_SIZE: Record<SizePreset, number> = {
   large: 140, // original
 };
 
+// SanctuaryCandle name: reduced from the original 140px so the slide reads
+// reverent rather than billboard-loud (Matthew's request: match other slides).
 export const SANCTUARY_CANDLE_NAME_SIZE: Record<SizePreset, number> = {
-  small: 88,
-  medium: 112,
-  large: 140, // original
+  small: 64,
+  medium: 88,
+  large: 112,
 };
 
 export function resolveSize<T extends Record<SizePreset, number>>(
