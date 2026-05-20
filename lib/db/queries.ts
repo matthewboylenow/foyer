@@ -1,4 +1,4 @@
-import { eq, and, or, isNull, lte, gte, desc } from 'drizzle-orm';
+import { eq, and, or, isNull, lte, gte, asc, desc } from 'drizzle-orm';
 import { db } from './client';
 import { slides, displays, settings, tenants, auditLog } from './schema';
 import type { SlideWithContent } from './schema';
@@ -86,15 +86,71 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
 
 
 export async function getSlidesByTenant(tenantId: string) {
+  // displayOrder ASC puts user-curated cards first; updatedAt DESC keeps
+  // unsorted slides (displayOrder = 0) newest-first as a tiebreaker.
   return db.query.slides.findMany({
     where: eq(slides.tenantId, tenantId),
-    orderBy: [desc(slides.updatedAt)],
+    orderBy: [asc(slides.displayOrder), desc(slides.updatedAt)],
   });
 }
 
 export async function getSlideById(id: string) {
   return db.query.slides.findFirst({
     where: eq(slides.id, id),
+  });
+}
+
+/**
+ * Like getSlidesByTenant but resolves every referenced media id to its
+ * blob URL so the admin grid can render real previews (bg image, logo,
+ * phone mockup). Falls back to tenant logo for parish_identity slides
+ * that don't override.
+ */
+export async function getSlidesByTenantWithMedia(tenantId: string) {
+  const list = await getSlidesByTenant(tenantId);
+  const tenantSettings = await db.query.settings.findFirst({
+    where: eq(settings.tenantId, tenantId),
+  });
+
+  const mediaIds = new Set<string>();
+  if (tenantSettings?.logoMediaId) mediaIds.add(tenantSettings.logoMediaId);
+  for (const s of list) {
+    const c = s.content as Record<string, unknown>;
+    if (typeof c?.logoMediaId === 'string') mediaIds.add(c.logoMediaId);
+    if (typeof c?.bgImageMediaId === 'string') mediaIds.add(c.bgImageMediaId);
+    if (typeof c?.bgVideoMediaId === 'string') mediaIds.add(c.bgVideoMediaId);
+    if (typeof c?.phoneMockupMediaId === 'string') mediaIds.add(c.phoneMockupMediaId);
+  }
+
+  const mediaRows = mediaIds.size > 0
+    ? await db.query.media.findMany({ where: (m, { inArray }) => inArray(m.id, Array.from(mediaIds)) })
+    : [];
+  const mediaMap = new Map(mediaRows.map((m) => [m.id, m.blobUrl]));
+
+  return list.map((s) => {
+    const c = s.content as Record<string, unknown>;
+    const resolvedMedia: Record<string, string> = {};
+    if (s.templateType === 'parish_identity') {
+      const slideLogoId = typeof c?.logoMediaId === 'string' ? c.logoMediaId : null;
+      const effectiveLogoId = slideLogoId ?? tenantSettings?.logoMediaId;
+      if (effectiveLogoId) {
+        const url = mediaMap.get(effectiveLogoId);
+        if (url) resolvedMedia.logoUrl = url;
+      }
+    }
+    if (typeof c?.bgImageMediaId === 'string') {
+      const url = mediaMap.get(c.bgImageMediaId);
+      if (url) resolvedMedia.bgImageUrl = url;
+    }
+    if (typeof c?.bgVideoMediaId === 'string') {
+      const url = mediaMap.get(c.bgVideoMediaId);
+      if (url) resolvedMedia.bgVideoUrl = url;
+    }
+    if (typeof c?.phoneMockupMediaId === 'string') {
+      const url = mediaMap.get(c.phoneMockupMediaId);
+      if (url) resolvedMedia.phoneMockupUrl = url;
+    }
+    return { ...s, resolvedMedia };
   });
 }
 

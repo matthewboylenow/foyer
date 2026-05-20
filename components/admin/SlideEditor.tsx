@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useHotkey } from '@/lib/useHotkey';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -185,6 +186,12 @@ export function SlideEditor({
   const updateContent = useCallback((key: string, value: unknown) => {
     setContent((prev) => ({ ...prev, [key]: value } as SlideContent));
   }, []);
+
+  // ⌘S / Ctrl+S to save from anywhere in the editor (including fields).
+  useHotkey('mod+s', (e) => {
+    e.preventDefault();
+    if (!saving) handleSave();
+  });
 
   return (
     <div>

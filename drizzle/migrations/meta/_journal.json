@@ -8,6 +8,13 @@
       "when": 1779246553060,
       "tag": "0000_left_thing",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1779306763623,
+      "tag": "0001_fresh_shard",
+      "breakpoints": true
     }
   ]
 }

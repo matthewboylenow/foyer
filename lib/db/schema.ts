@@ -86,6 +86,11 @@ export const slides = pgTable('slides', {
   active: boolean('active').default(true).notNull(),
   weight: integer('weight').default(1).notNull(),
   durationOverrideSec: integer('duration_override_sec'),
+  /** Admin-facing sort order in the slide grid. Does NOT affect TV playback —
+   *  rotation is still weight-based shuffle. 0 = unsorted (defaults to
+   *  updatedAt DESC tiebreaker). Reordering assigns 10, 20, 30… with room
+   *  to insert between without renumbering. */
+  displayOrder: integer('display_order').default(0).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   createdBy: text('created_by'),

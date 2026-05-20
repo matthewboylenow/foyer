@@ -53,6 +53,7 @@ const FALLBACK_SLIDE: PlayerSlide = {
   active: true,
   weight: 1,
   durationOverrideSec: null,
+  displayOrder: 0,
   createdAt: new Date(),
   updatedAt: new Date(),
   createdBy: null,

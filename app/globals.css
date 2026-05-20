@@ -250,3 +250,38 @@
 [data-exiting="true"] .word-stagger {
   animation-play-state: paused;
 }
+
+/* Slide-thumb wrappers (used in admin SlideCard previews) also freeze
+   ambient motion — same data-exiting attribute. The selector above already
+   covers them; this comment is here so future-you doesn't add a second one. */
+
+/* Branded toast accent stripe — drawn via ::before because sonner builds
+   the toast DOM internally. Stripe color shifts per variant.  */
+.foyer-toast::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--color-navy);
+}
+.foyer-toast[data-type="success"]::before { background: var(--color-gold); }
+.foyer-toast[data-type="error"]::before { background: var(--color-rust); }
+.foyer-toast[data-type="warning"]::before { background: var(--color-rust); }
+.foyer-toast[data-type="info"]::before { background: var(--color-navy); }
+
+/* Admin page route fade-in. Composite-only — opacity + tiny rise.
+   Keyed by pathname in AdminPageTransition so each route renders fresh. */
+@keyframes admin-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.admin-page-enter {
+  animation: admin-page-enter 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform;
+}

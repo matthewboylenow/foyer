@@ -4,7 +4,15 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { signOut } from 'next-auth/react';
-import { Menu, X, LogOut } from 'lucide-react';
+import {
+  LayoutGrid,
+  Monitor,
+  Activity,
+  Settings as SettingsIcon,
+  Menu,
+  X,
+  LogOut,
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,11 +20,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-const NAV_LINKS = [
-  { href: '/admin/slides', label: 'Slides' },
-  { href: '/admin/displays', label: 'Displays' },
-  { href: '/admin/audit', label: 'Activity' },
-  { href: '/admin/settings', label: 'Settings' },
+interface NavLink {
+  href: '/admin/slides' | '/admin/displays' | '/admin/audit' | '/admin/settings';
+  label: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+}
+
+const NAV_LINKS: NavLink[] = [
+  { href: '/admin/slides', label: 'Slides', icon: LayoutGrid },
+  { href: '/admin/displays', label: 'Displays', icon: Monitor },
+  { href: '/admin/audit', label: 'Activity', icon: Activity },
+  { href: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
 interface AdminNavProps {
@@ -28,39 +42,59 @@ export function AdminNav({ user }: AdminNavProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="border-b border-border bg-background sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center h-14 gap-6">
-        {/* Logo */}
-        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-        <Link href={'/admin/slides' as any} className="font-serif text-navy font-bold text-xl shrink-0">
-          Foyer
-        </Link>
+    <>
+      {/* Desktop sidebar — fixed left rail in navy with cream/gold accents */}
+      <aside className="hidden lg:flex fixed top-0 left-0 bottom-0 w-56 flex-col bg-navy-900 text-cream/85 z-40 border-r border-cream/5">
+        <div className="px-6 pt-7 pb-5">
+          <Link
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            href={'/admin/slides' as any}
+            className="block font-serif text-cream font-bold text-2xl tracking-tight leading-none"
+          >
+            Foyer
+          </Link>
+          <div className="mt-1 text-[10px] uppercase tracking-[0.25em] text-gold/70 font-medium">
+            Saint Helen
+          </div>
+        </div>
 
-        {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-1 flex-1">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              href={link.href as any}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                pathname.startsWith(link.href)
-                  ? 'bg-navy text-cream'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              {link.label}
-            </Link>
-          ))}
+        <div className="px-3 mt-2">
+          <div className="h-px bg-gold/15 mx-3" />
+        </div>
+
+        <nav className="flex-1 px-3 py-4 space-y-1">
+          {NAV_LINKS.map((link) => {
+            const active = pathname.startsWith(link.href);
+            const Icon = link.icon;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                  active
+                    ? 'bg-cream text-navy font-semibold shadow-sm'
+                    : 'text-cream/75 hover:text-cream hover:bg-cream/5'
+                }`}
+              >
+                <Icon size={16} className={active ? 'text-rust' : 'text-cream/55'} />
+                <span>{link.label}</span>
+              </Link>
+            );
+          })}
         </nav>
 
-        {/* User menu (desktop) */}
-        <div className="hidden md:flex ml-auto items-center gap-2">
+        <div className="px-3 pb-6">
+          <div className="h-px bg-gold/15 mx-3 mb-4" />
           <DropdownMenu>
-            <DropdownMenuTrigger className="text-sm text-muted-foreground px-3 py-1 rounded hover:bg-muted">
-              {user?.email ?? 'User'} ▾
+            <DropdownMenuTrigger className="w-full text-left px-3 py-2 rounded-lg hover:bg-cream/5 group">
+              <div className="text-[10px] uppercase tracking-widest text-cream/40 mb-0.5">
+                Signed in
+              </div>
+              <div className="text-sm text-cream/85 truncate">
+                {user?.email ?? 'User'}
+              </div>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="start" side="top">
               <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/login' })}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign out
@@ -68,43 +102,55 @@ export function AdminNav({ user }: AdminNavProps) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+      </aside>
 
-        {/* Mobile hamburger */}
-        <button
-          className="md:hidden ml-auto p-2 text-muted-foreground"
-          onClick={() => setMobileOpen(!mobileOpen)}
-          aria-label="Toggle menu"
-        >
-          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
-      </div>
-
-      {/* Mobile nav dropdown */}
-      {mobileOpen && (
-        <div className="md:hidden border-t border-border bg-background px-4 py-3 space-y-1">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              href={link.href as any}
-              className={`block px-3 py-2 rounded-md text-sm font-medium ${
-                pathname.startsWith(link.href)
-                  ? 'bg-navy text-cream'
-                  : 'text-muted-foreground hover:bg-muted'
-              }`}
-              onClick={() => setMobileOpen(false)}
-            >
-              {link.label}
-            </Link>
-          ))}
-          <button
-            className="block w-full text-left px-3 py-2 text-sm text-rust font-medium"
-            onClick={() => signOut({ callbackUrl: '/login' })}
+      {/* Mobile / tablet top bar */}
+      <header className="lg:hidden sticky top-0 z-40 bg-navy-900 text-cream border-b border-cream/5">
+        <div className="flex items-center h-14 px-4 gap-4">
+          <Link
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            href={'/admin/slides' as any}
+            className="font-serif text-cream font-bold text-xl"
           >
-            Sign out
+            Foyer
+          </Link>
+          <button
+            className="ml-auto p-2 text-cream/70 hover:text-cream"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label="Toggle menu"
+          >
+            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
-      )}
-    </header>
+        {mobileOpen && (
+          <div className="border-t border-cream/5 px-3 py-3 space-y-1">
+            {NAV_LINKS.map((link) => {
+              const active = pathname.startsWith(link.href);
+              const Icon = link.icon;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${
+                    active ? 'bg-cream text-navy font-semibold' : 'text-cream/75 hover:bg-cream/5'
+                  }`}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <Icon size={16} className={active ? 'text-rust' : 'text-cream/55'} />
+                  {link.label}
+                </Link>
+              );
+            })}
+            <button
+              className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg text-sm text-rust"
+              onClick={() => signOut({ callbackUrl: '/login' })}
+            >
+              <LogOut size={16} />
+              Sign out
+            </button>
+          </div>
+        )}
+      </header>
+    </>
   );
 }
