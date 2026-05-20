@@ -22,6 +22,13 @@
       "when": 1779308639368,
       "tag": "0002_odd_shooting_star",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779309135750,
+      "tag": "0003_neat_ultimatum",
+      "breakpoints": true
     }
   ]
 }

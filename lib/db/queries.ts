@@ -1,6 +1,6 @@
 import { eq, and, or, isNull, lte, gte, asc, desc } from 'drizzle-orm';
 import { db } from './client';
-import { slides, displays, settings, tenants, auditLog } from './schema';
+import { slides, displays, settings, tenants, auditLog, errors } from './schema';
 import type { SlideWithContent } from './schema';
 
 export type EligibleSlide = SlideWithContent & {
@@ -201,6 +201,17 @@ export async function getRecentAuditLog(tenantId: string, limit = 100) {
   return db.query.auditLog.findMany({
     where: eq(auditLog.tenantId, tenantId),
     orderBy: [desc(auditLog.createdAt)],
+    limit,
+  });
+}
+
+export async function getRecentErrors(tenantId: string, limit = 100) {
+  // Errors may have null tenantId (e.g. server-side errors fired before
+  // tenant context is established); include those too so they're visible
+  // in the only admin we have.
+  return db.query.errors.findMany({
+    where: or(eq(errors.tenantId, tenantId), isNull(errors.tenantId)),
+    orderBy: [desc(errors.createdAt)],
     limit,
   });
 }

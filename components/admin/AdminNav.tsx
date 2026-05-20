@@ -8,6 +8,7 @@ import {
   LayoutGrid,
   Monitor,
   Activity,
+  AlertTriangle,
   Settings as SettingsIcon,
   Menu,
   X,
@@ -21,7 +22,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 interface NavLink {
-  href: '/admin/slides' | '/admin/displays' | '/admin/audit' | '/admin/settings';
+  href:
+    | '/admin/slides'
+    | '/admin/displays'
+    | '/admin/audit'
+    | '/admin/errors'
+    | '/admin/settings';
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
 }
@@ -30,6 +36,7 @@ const NAV_LINKS: NavLink[] = [
   { href: '/admin/slides', label: 'Slides', icon: LayoutGrid },
   { href: '/admin/displays', label: 'Displays', icon: Monitor },
   { href: '/admin/audit', label: 'Activity', icon: Activity },
+  { href: '/admin/errors', label: 'Errors', icon: AlertTriangle },
   { href: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
@@ -69,7 +76,8 @@ export function AdminNav({ user }: AdminNavProps) {
             return (
               <Link
                 key={link.href}
-                href={link.href}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                href={link.href as any}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
                   active
                     ? 'bg-cream text-navy font-semibold shadow-sm'
@@ -130,7 +138,8 @@ export function AdminNav({ user }: AdminNavProps) {
               return (
                 <Link
                   key={link.href}
-                  href={link.href}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  href={link.href as any}
                   className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${
                     active ? 'bg-cream text-navy font-semibold' : 'text-cream/75 hover:bg-cream/5'
                   }`}

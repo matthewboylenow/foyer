@@ -165,6 +165,29 @@ export const auditLog = pgTable('audit_log', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+/**
+ * Runtime errors captured from anywhere in the system (player template
+ * throws, API 500s, unhandled rejections in admin). Self-contained — we
+ * use this table instead of Sentry so the parish doesn't need an external
+ * account and v1.6 ships standalone.
+ *
+ * `source` distinguishes player vs api vs admin to make the admin list
+ * filterable. `context` is whatever the caller wants to include
+ * (display id, slide id, route, user-agent, etc.); displayId and slideId
+ * are also columns for easy joining.
+ */
+export const errors = pgTable('errors', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').references(() => tenants.id),
+  source: text('source').notNull(),
+  message: text('message').notNull(),
+  stack: text('stack'),
+  context: jsonb('context').default({}),
+  displayId: uuid('display_id'),
+  slideId: uuid('slide_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ─── TypeScript content types per template ───────────────────────────────────
 
 export type SizePreset = 'small' | 'medium' | 'large';

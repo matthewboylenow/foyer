@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { SlideFrame } from './SlideFrame';
+import { SlideErrorBoundary } from './SlideErrorBoundary';
 import { buildShuffledPool, slidesHaveChanged } from './shuffle';
 import { templates } from '@/components/templates';
+import { reportError } from '@/lib/reportError';
 import type { SlideWithContent } from '@/lib/db/schema';
 
 type PlayerSlide = SlideWithContent & {
@@ -70,6 +72,54 @@ export function Player({ displayId }: PlayerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const queuedSlidesRef = useRef<PlayerSlide[] | null>(null);
   const [ready, setReady] = useState(false);
+  // Slides whose templates have thrown during this session — filtered out
+  // of the pool on next rebuild so we don't loop on a broken slide.
+  const [bannedIds, setBannedIds] = useState<Set<string>>(() => new Set());
+
+  const banSlide = useCallback((id: string) => {
+    setBannedIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  // Global error capture for the player page — anything thrown outside the
+  // template boundary (network, framework code, motion-react internals)
+  // still gets reported with display context.
+  useEffect(() => {
+    function onError(e: ErrorEvent) {
+      reportError({
+        source: 'player',
+        message: e.message || 'window.onerror (no message)',
+        stack: e.error?.stack,
+        displayId,
+        context: { filename: e.filename, lineno: e.lineno, colno: e.colno },
+      });
+    }
+    function onRejection(e: PromiseRejectionEvent) {
+      const reason = e.reason as unknown;
+      const message =
+        reason instanceof Error
+          ? reason.message
+          : typeof reason === 'string'
+            ? reason
+            : 'Unhandled promise rejection';
+      reportError({
+        source: 'player',
+        message,
+        stack: reason instanceof Error ? reason.stack : undefined,
+        displayId,
+      });
+    }
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  }, [displayId]);
 
   // Initial load: try API then cache then fallback
   useEffect(() => {
@@ -158,10 +208,17 @@ export function Player({ displayId }: PlayerProps) {
       1000;
     const watchdog = setTimeout(() => {
       console.warn('Watchdog: slide did not advance — reloading');
+      reportError({
+        source: 'player',
+        message: 'Watchdog reload — slide did not advance in 3× expected duration',
+        displayId,
+        slideId: current.id,
+        context: { templateType: current.templateType, expectedMs: expected },
+      });
       window.location.reload();
     }, expected);
     return () => clearTimeout(watchdog);
-  }, [currentIndex, pool]);
+  }, [currentIndex, pool, displayId]);
 
   // Nightly reload at 3 AM Eastern
   useEffect(() => {
@@ -230,20 +287,30 @@ export function Player({ displayId }: PlayerProps) {
     setCurrentIndex((prev) => {
       const next = prev + 1;
       if (next >= pool.length) {
-        // Loop boundary — adopt any queued slide update
+        // Loop boundary — adopt any queued slide update and apply ban filter
+        const source = queuedSlidesRef.current ?? slides;
         if (queuedSlidesRef.current) {
-          const newSlides = queuedSlidesRef.current;
           queuedSlidesRef.current = null;
-          setSlides(newSlides);
-          setPool(buildShuffledPool(newSlides));
-        } else {
-          setPool(buildShuffledPool(slides));
+          setSlides(source);
         }
+        const filtered = source.filter((s) => !bannedIds.has(s.id));
+        setPool(buildShuffledPool(filtered.length > 0 ? filtered : source));
         return 0;
       }
       return next;
     });
-  }, [pool.length, slides]);
+  }, [pool.length, slides, bannedIds]);
+
+  // If a slide gets banned mid-cycle, drop it from the live pool too so the
+  // rotation doesn't bring it back this cycle.
+  useEffect(() => {
+    if (bannedIds.size === 0) return;
+    setPool((prev) => {
+      const filtered = prev.filter((s) => !bannedIds.has(s.id));
+      // Keep at least one slide on screen even if everything is banned.
+      return filtered.length > 0 ? filtered : prev;
+    });
+  }, [bannedIds]);
 
   if (!ready || pool.length === 0) {
     return <div className="w-full h-full bg-navy-900" />;
@@ -270,13 +337,20 @@ export function Player({ displayId }: PlayerProps) {
         holdMs={holdMs}
         onDone={handleSlideDone}
       >
-        <SlideComponent
-          content={current.content}
-          logoUrl={resolved.logoUrl}
-          bgImageUrl={resolved.bgImageUrl}
-          bgVideoUrl={resolved.bgVideoUrl}
-          phoneMockupUrl={resolved.phoneMockupUrl}
-        />
+        <SlideErrorBoundary
+          displayId={displayId}
+          slideId={current.id}
+          templateType={current.templateType}
+          onBadSlide={banSlide}
+        >
+          <SlideComponent
+            content={current.content}
+            logoUrl={resolved.logoUrl}
+            bgImageUrl={resolved.bgImageUrl}
+            bgVideoUrl={resolved.bgVideoUrl}
+            phoneMockupUrl={resolved.phoneMockupUrl}
+          />
+        </SlideErrorBoundary>
       </SlideFrame>
     </div>
   );
