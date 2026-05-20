@@ -7,7 +7,6 @@ import type { WeeklyAssociationContent } from '@/lib/db/schema';
 
 export function WeeklyAssociation({ content }: { content: WeeklyAssociationContent }) {
   const { names } = content;
-  const twoColumns = names.length > 6;
   // Baseline 44px (down from 64) so names read in line with the rest of the
   // templates rather than dominating the canvas. Auto-scale down for long lists.
   const fontSize = names.length > 7 ? Math.max(32, 44 - (names.length - 7) * 2) : 44;
@@ -57,9 +56,7 @@ export function WeeklyAssociation({ content }: { content: WeeklyAssociationConte
           transition={{ duration: 1.2, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
         />
 
-        <div
-          className={`${twoColumns ? 'grid grid-cols-2 gap-x-20' : 'flex flex-col'} gap-y-5 w-full`}
-        >
+        <div className="flex flex-col items-center gap-y-5 w-full">
           {names.map((name, i) => (
             <BlurIn
               key={i}
