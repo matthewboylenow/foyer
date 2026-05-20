@@ -36,6 +36,7 @@ export async function PATCH(
   const allowed = [
     'title', 'content', 'scheduleType', 'startAt', 'endAt',
     'active', 'weight', 'durationOverrideSec', 'targetDisplays',
+    'collectionId',
   ];
 
   for (const key of allowed) {

@@ -5,6 +5,7 @@ import {
   getDefaultTenant,
   getSettingsWithMedia,
   getDisplaysByTenant,
+  getCollectionsByTenant,
 } from '@/lib/db/queries';
 import type { TemplateKey } from '@/components/templates';
 
@@ -20,6 +21,7 @@ export default async function NewSlideByTemplatePage({
   const settings = tenant ? await getSettingsWithMedia(tenant.id) : null;
   const tenantLogoUrl = settings?.logoMedia?.blobUrl ?? null;
   const displays = tenant ? await getDisplaysByTenant(tenant.id) : [];
+  const collections = tenant ? await getCollectionsByTenant(tenant.id) : [];
 
   return (
     <SlideEditor
@@ -27,6 +29,7 @@ export default async function NewSlideByTemplatePage({
       initialSlide={null}
       tenantLogoUrl={tenantLogoUrl}
       displays={displays.map((d) => ({ id: d.id, name: d.name }))}
+      collections={collections}
     />
   );
 }

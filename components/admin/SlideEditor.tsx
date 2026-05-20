@@ -23,7 +23,8 @@ import { RichTextEditor } from './RichTextEditor';
 import { resolveLogoPercent } from '@/components/templates/sizing';
 import { templates } from '@/components/templates';
 import type { TemplateKey } from '@/components/templates';
-import type { SlideWithContent, SlideContent, MassScheduleRow, SizePreset, TextMode } from '@/lib/db/schema';
+import { CollectionPicker } from './CollectionPicker';
+import type { SlideWithContent, SlideContent, MassScheduleRow, SizePreset, TextMode, Collection } from '@/lib/db/schema';
 import type { TimeValue } from '@/lib/time';
 
 interface SlideEditorProps {
@@ -31,6 +32,7 @@ interface SlideEditorProps {
   initialSlide: SlideWithContent | null;
   tenantLogoUrl?: string | null;
   displays?: { id: string; name: string }[];
+  collections?: Collection[];
   initialMedia?: {
     logoUrl?: string | null;
     bgImageUrl?: string | null;
@@ -63,12 +65,17 @@ export function SlideEditor({
   initialSlide,
   tenantLogoUrl,
   displays = [],
+  collections: initialCollections = [],
   initialMedia,
 }: SlideEditorProps) {
   const router = useRouter();
   const isNew = !initialSlide;
 
   const [title, setTitle] = useState(initialSlide?.title ?? '');
+  const [collections, setCollections] = useState<Collection[]>(initialCollections);
+  const [collectionId, setCollectionId] = useState<string | null>(
+    initialSlide?.collectionId ?? null,
+  );
   const [content, setContent] = useState<SlideContent>(
     (initialSlide?.content as SlideContent) ?? defaultContent(templateType),
   );
@@ -111,6 +118,7 @@ export function SlideEditor({
       weight: parseFloat(weight) || 1,
       durationOverrideSec: durationOverride ? parseInt(durationOverride) : null,
       targetDisplays,
+      collectionId,
     };
 
     if (scheduleType === 'dated') {
@@ -375,6 +383,17 @@ export function SlideEditor({
                 placeholder={`${templateConfig.defaultDurationSec}`}
               />
             </div>
+          </div>
+
+          {/* Collection assignment — bundle slides into seasonal/editorial packs */}
+          <div className="p-4 border border-border rounded-lg space-y-3">
+            <h3 className="font-medium text-sm">Collection</h3>
+            <CollectionPicker
+              collections={collections}
+              value={collectionId}
+              onChange={setCollectionId}
+              onCollectionCreated={(c) => setCollections((prev) => [...prev, c])}
+            />
           </div>
 
           {/* Per-display targeting */}

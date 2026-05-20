@@ -28,9 +28,12 @@ import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { templates } from '@/components/templates';
 import { SlideCard, type SlideCardData } from './SlideCard';
+import { COLLECTION_COLORS } from './CollectionPicker';
+import type { Collection } from '@/lib/db/schema';
 
 interface SlideGridProps {
   slides: SlideCardData[];
+  collections?: Collection[];
 }
 
 type StatusFilter = 'all' | 'active' | 'inactive';
@@ -39,14 +42,20 @@ const TEMPLATE_LABELS = Object.fromEntries(
   Object.entries(templates).map(([k, v]) => [k, v.label]),
 );
 
-export function SlideGrid({ slides: initialSlides }: SlideGridProps) {
+export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGridProps) {
   const router = useRouter();
   const [slides, setSlides] = useState<SlideCardData[]>(initialSlides);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [collectionFilter, setCollectionFilter] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  const collectionsById = useMemo(
+    () => Object.fromEntries(collections.map((c) => [c.id, c])),
+    [collections],
+  );
 
   // `/` focuses the search input. `n` creates a new slide. `Esc` clears
   // selection or search. Skips when focus is in another input.
@@ -72,6 +81,7 @@ export function SlideGrid({ slides: initialSlides }: SlideGridProps) {
     return slides.filter((s) => {
       if (statusFilter === 'active' && !s.active) return false;
       if (statusFilter === 'inactive' && s.active) return false;
+      if (collectionFilter && s.collectionId !== collectionFilter) return false;
       if (!q) return true;
       const label = TEMPLATE_LABELS[s.templateType] ?? '';
       return (
@@ -80,7 +90,7 @@ export function SlideGrid({ slides: initialSlides }: SlideGridProps) {
         s.templateType.toLowerCase().includes(q)
       );
     });
-  }, [slides, statusFilter, query]);
+  }, [slides, statusFilter, collectionFilter, query]);
 
   const counts = useMemo(
     () => ({
@@ -214,6 +224,35 @@ export function SlideGrid({ slides: initialSlides }: SlideGridProps) {
     }
   }
 
+  async function bulkSetActiveForCollection(collectionId: string, makeActive: boolean) {
+    // Optimistic: flip every slide whose collectionId matches.
+    const affectedIds = slides.filter((s) => s.collectionId === collectionId).map((s) => s.id);
+    setSlides((prev) =>
+      prev.map((s) => (s.collectionId === collectionId ? { ...s, active: makeActive } : s)),
+    );
+    try {
+      const res = await fetch(`/api/collections/${collectionId}/active`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: makeActive }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      toast.success(
+        `${affectedIds.length} slide${affectedIds.length === 1 ? '' : 's'} ${
+          makeActive ? 'activated' : 'deactivated'
+        }`,
+      );
+    } catch {
+      // Revert
+      setSlides((prev) =>
+        prev.map((s) =>
+          s.collectionId === collectionId ? { ...s, active: !makeActive } : s,
+        ),
+      );
+      toast.error("Couldn't update collection");
+    }
+  }
+
   async function bulkDelete() {
     const ids = Array.from(selected);
     if (!confirm(`Delete ${ids.length} slide${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
@@ -310,6 +349,56 @@ export function SlideGrid({ slides: initialSlides }: SlideGridProps) {
         </Link>
       </div>
 
+      {/* Collection filter row — only when there are collections to filter by */}
+      {collections.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setCollectionFilter(null)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+              collectionFilter === null
+                ? 'border-navy bg-navy text-cream'
+                : 'border-navy/15 text-navy/65 hover:border-navy/40 hover:text-navy'
+            }`}
+          >
+            All collections
+          </button>
+          {collections.map((c) => {
+            const swatch = COLLECTION_COLORS.find((sw) => sw.id === c.color) ?? COLLECTION_COLORS[0];
+            const active = collectionFilter === c.id;
+            return (
+              <button
+                key={c.id}
+                onClick={() => setCollectionFilter(active ? null : c.id)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                  active
+                    ? 'border-navy bg-navy text-cream'
+                    : 'border-navy/15 text-navy/70 hover:border-navy/40 hover:text-navy'
+                }`}
+              >
+                <span className={`size-2 rounded-full ${swatch.bg}`} aria-hidden />
+                {c.name}
+              </button>
+            );
+          })}
+          {collectionFilter && (
+            <div className="ml-2 inline-flex items-center gap-2 text-xs">
+              <button
+                onClick={() => bulkSetActiveForCollection(collectionFilter, true)}
+                className="px-2.5 py-1 rounded-md bg-gold/15 text-gold hover:bg-gold/25 font-medium"
+              >
+                Activate pack
+              </button>
+              <button
+                onClick={() => bulkSetActiveForCollection(collectionFilter, false)}
+                className="px-2.5 py-1 rounded-md bg-navy/5 text-navy/70 hover:bg-navy/10 font-medium"
+              >
+                Deactivate pack
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Bulk action bar */}
       {selected.size > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-navy text-cream text-sm">
@@ -362,18 +451,22 @@ export function SlideGrid({ slides: initialSlides }: SlideGridProps) {
               className="grid gap-5"
               style={{ gridTemplateColumns: 'repeat(auto-fill, 240px)' }}
             >
-              {filtered.map((slide) => (
-                <SortableSlideCard
-                  key={slide.id}
-                  slide={slide}
-                  selected={selected.has(slide.id)}
-                  onSelectToggle={toggleSelect}
-                  onActiveToggle={toggleActive}
-                  onDuplicate={duplicateSlide}
-                  onDelete={deleteSlide}
-                  isActiveDrag={activeDragId === slide.id}
-                />
-              ))}
+              {filtered.map((slide) => {
+                const coll = slide.collectionId ? collectionsById[slide.collectionId] ?? null : null;
+                return (
+                  <SortableSlideCard
+                    key={slide.id}
+                    slide={slide}
+                    collection={coll}
+                    selected={selected.has(slide.id)}
+                    onSelectToggle={toggleSelect}
+                    onActiveToggle={toggleActive}
+                    onDuplicate={duplicateSlide}
+                    onDelete={deleteSlide}
+                    isActiveDrag={activeDragId === slide.id}
+                  />
+                );
+              })}
             </div>
           </SortableContext>
         </DndContext>
@@ -386,6 +479,7 @@ export function SlideGrid({ slides: initialSlides }: SlideGridProps) {
 // listeners through to SlideCard's grip button.
 function SortableSlideCard({
   slide,
+  collection,
   selected,
   onSelectToggle,
   onActiveToggle,
@@ -394,6 +488,7 @@ function SortableSlideCard({
   isActiveDrag,
 }: {
   slide: SlideCardData;
+  collection: Collection | null;
   selected: boolean;
   onSelectToggle: (id: string) => void;
   onActiveToggle: (id: string, current: boolean) => void;
@@ -421,6 +516,7 @@ function SortableSlideCard({
     <div ref={setNodeRef} style={style}>
       <SlideCard
         slide={slide}
+        collection={collection}
         selected={selected}
         onSelectToggle={onSelectToggle}
         onActiveToggle={onActiveToggle}

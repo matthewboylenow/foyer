@@ -1,6 +1,6 @@
 import { eq, and, or, isNull, lte, gte, asc, desc } from 'drizzle-orm';
 import { db } from './client';
-import { slides, displays, settings, tenants, auditLog, errors } from './schema';
+import { slides, displays, settings, tenants, auditLog, errors, collections } from './schema';
 import type { SlideWithContent } from './schema';
 
 export type EligibleSlide = SlideWithContent & {
@@ -202,6 +202,13 @@ export async function getRecentAuditLog(tenantId: string, limit = 100) {
     where: eq(auditLog.tenantId, tenantId),
     orderBy: [desc(auditLog.createdAt)],
     limit,
+  });
+}
+
+export async function getCollectionsByTenant(tenantId: string) {
+  return db.query.collections.findMany({
+    where: eq(collections.tenantId, tenantId),
+    orderBy: [asc(collections.displayOrder), asc(collections.createdAt)],
   });
 }
 

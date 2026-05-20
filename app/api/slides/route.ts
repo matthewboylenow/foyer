@@ -22,7 +22,19 @@ export async function POST(req: Request) {
   if (!tenant) return Response.json({ error: 'No tenant' }, { status: 400 });
 
   const body = await req.json();
-  const { title, templateType, content, scheduleType, startAt, endAt, active, weight, durationOverrideSec } = body;
+  const {
+    title,
+    templateType,
+    content,
+    scheduleType,
+    startAt,
+    endAt,
+    active,
+    weight,
+    durationOverrideSec,
+    collectionId,
+    targetDisplays,
+  } = body;
 
   const [created] = await db
     .insert(slides)
@@ -37,6 +49,8 @@ export async function POST(req: Request) {
       active: active ?? true,
       weight: weight ?? 1,
       durationOverrideSec: durationOverrideSec ?? null,
+      collectionId: collectionId ?? null,
+      targetDisplays: targetDisplays ?? [],
       createdBy: session?.user?.email ?? null,
       updatedBy: session?.user?.email ?? null,
     })

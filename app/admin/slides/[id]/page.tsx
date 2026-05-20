@@ -5,6 +5,7 @@ import {
   getSettingsWithMedia,
   getMediaById,
   getDisplaysByTenant,
+  getCollectionsByTenant,
 } from '@/lib/db/queries';
 import { SlideEditor } from '@/components/admin/SlideEditor';
 import type { TemplateKey } from '@/components/templates';
@@ -23,6 +24,7 @@ export default async function EditSlidePage({
   const settings = tenant ? await getSettingsWithMedia(tenant.id) : null;
   const tenantLogoUrl = settings?.logoMedia?.blobUrl ?? null;
   const displays = tenant ? await getDisplaysByTenant(tenant.id) : [];
+  const collections = tenant ? await getCollectionsByTenant(tenant.id) : [];
 
   const content = slide.content as Record<string, unknown>;
   const ids: Record<string, string | null> = {
@@ -45,6 +47,7 @@ export default async function EditSlidePage({
       initialSlide={slide as SlideWithContent}
       tenantLogoUrl={tenantLogoUrl}
       displays={displays.map((d) => ({ id: d.id, name: d.name }))}
+      collections={collections}
       initialMedia={{
         logoUrl: resolved.logo,
         bgImageUrl: resolved.bg,

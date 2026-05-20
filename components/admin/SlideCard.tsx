@@ -11,7 +11,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import type { Slide, SlideContent } from '@/lib/db/schema';
+import { COLLECTION_COLORS } from './CollectionPicker';
+import type { Slide, SlideContent, Collection } from '@/lib/db/schema';
 
 const TEMPLATE_LABELS: Record<string, string> = Object.fromEntries(
   Object.entries(templates).map(([k, v]) => [k, v.label]),
@@ -29,6 +30,8 @@ export interface SlideCardData extends Slide {
 
 interface SlideCardProps {
   slide: SlideCardData;
+  /** Optional collection metadata for the chip; passed by SlideGrid. */
+  collection?: Collection | null;
   selected?: boolean;
   onSelectToggle?: (id: string) => void;
   onActiveToggle: (id: string, current: boolean) => void;
@@ -42,6 +45,7 @@ interface SlideCardProps {
 
 export function SlideCard({
   slide,
+  collection = null,
   selected = false,
   onSelectToggle,
   onActiveToggle,
@@ -50,6 +54,9 @@ export function SlideCard({
   dragging = false,
   dragHandleProps,
 }: SlideCardProps) {
+  const collectionSwatch = collection
+    ? COLLECTION_COLORS.find((s) => s.id === collection.color) ?? COLLECTION_COLORS[0]
+    : null;
   const templateConfig = templates[slide.templateType];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const TemplateComponent = templateConfig?.component as React.ComponentType<any> | undefined;
@@ -184,6 +191,15 @@ export function SlideCard({
             aria-label={slide.active ? 'Deactivate' : 'Activate'}
           />
         </div>
+
+        {collection && collectionSwatch && (
+          <div className="mt-2 inline-flex items-center gap-1.5 text-[10px]">
+            <span className={`size-2 rounded-full ${collectionSwatch.bg}`} aria-hidden />
+            <span className="font-medium text-navy/65 truncate" title={collection.name}>
+              {collection.name}
+            </span>
+          </div>
+        )}
 
         <div className="flex items-center gap-2 mt-2 text-[11px] text-navy/55">
           <Calendar size={11} className="shrink-0" />

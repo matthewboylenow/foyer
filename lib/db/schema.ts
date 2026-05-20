@@ -81,6 +81,25 @@ export const settings = pgTable('settings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+/**
+ * A "Collection" groups slides into editorial packs (e.g. "Easter Triduum",
+ * "Lent 2026"). Membership is one-to-many — a slide belongs to zero or one
+ * collection. Collections give the admin bulk activate / deactivate plus
+ * visual grouping in the grid. Deliberately *not* a scheduling primitive
+ * (slides keep their own startAt/endAt) so v1.6 stays simple.
+ */
+export const collections = pgTable('collections', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  name: text('name').notNull(),
+  /** Brand-palette accent: 'rust' | 'gold' | 'navy' | 'sage' | 'plum' | 'sky'.
+   *  Stored as text rather than an enum so adding swatches doesn't need a
+   *  migration. Frontend maps unknown values to 'rust'. */
+  color: text('color').default('rust').notNull(),
+  displayOrder: integer('display_order').default(0).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const slides = pgTable('slides', {
   id: uuid('id').primaryKey().defaultRandom(),
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
@@ -94,6 +113,11 @@ export const slides = pgTable('slides', {
   active: boolean('active').default(true).notNull(),
   weight: integer('weight').default(1).notNull(),
   durationOverrideSec: integer('duration_override_sec'),
+  /** Optional collection membership. ON DELETE SET NULL: deleting a
+   *  collection un-groups its slides rather than cascade-deleting them. */
+  collectionId: uuid('collection_id').references(() => collections.id, {
+    onDelete: 'set null',
+  }),
   /** Admin-facing sort order in the slide grid. Does NOT affect TV playback —
    *  rotation is still weight-based shuffle. 0 = unsorted (defaults to
    *  updatedAt DESC tiebreaker). Reordering assigns 10, 20, 30… with room
@@ -297,5 +321,13 @@ export type Settings = typeof settings.$inferSelect;
 export type Slide = typeof slides.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type AuditLogEntry = typeof auditLog.$inferSelect;
+export type Collection = typeof collections.$inferSelect;
+export type CollectionColor =
+  | 'rust'
+  | 'gold'
+  | 'navy'
+  | 'sage'
+  | 'plum'
+  | 'sky';
 
 export type SlideWithContent = Omit<Slide, 'content'> & { content: SlideContent };

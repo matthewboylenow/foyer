@@ -1,11 +1,18 @@
 import { Suspense } from 'react';
-import { getDefaultTenant, getSlidesByTenantWithMedia } from '@/lib/db/queries';
+import {
+  getDefaultTenant,
+  getSlidesByTenantWithMedia,
+  getCollectionsByTenant,
+} from '@/lib/db/queries';
 import { SlideGrid } from '@/components/admin/SlideGrid';
 import { SlideGridSkeleton } from '@/components/admin/SlideGridSkeleton';
 
 export default async function SlidesPage() {
   const tenant = await getDefaultTenant();
-  const slides = tenant ? await getSlidesByTenantWithMedia(tenant.id) : [];
+  const [slides, collections] = await Promise.all([
+    tenant ? getSlidesByTenantWithMedia(tenant.id) : [],
+    tenant ? getCollectionsByTenant(tenant.id) : [],
+  ]);
 
   return (
     <div>
@@ -17,7 +24,7 @@ export default async function SlidesPage() {
         </p>
       </div>
       <Suspense fallback={<SlideGridSkeleton />}>
-        <SlideGrid slides={slides} />
+        <SlideGrid slides={slides} collections={collections} />
       </Suspense>
     </div>
   );
