@@ -1,0 +1,482 @@
+'use client';
+
+import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { ActiveToggle } from './ActiveToggle';
+import { TimePicker } from './TimePicker';
+import { PasteParser } from './PasteParser';
+import { templates } from '@/components/templates';
+import type { TemplateKey } from '@/components/templates';
+import type { SlideWithContent, SlideContent, MassScheduleRow } from '@/lib/db/schema';
+import type { TimeValue } from '@/lib/time';
+
+interface SlideEditorProps {
+  templateType: TemplateKey;
+  initialSlide: SlideWithContent | null;
+}
+
+function defaultContent(templateType: TemplateKey): SlideContent {
+  switch (templateType) {
+    case 'parish_identity':
+      return { templateType, headline: '', subline: '' };
+    case 'welcome_quote':
+      return { templateType, quote: '', attribution: '' };
+    case 'general':
+      return { templateType, headline: '', body: '', meta: '', motionStyle: 'lineMask' };
+    case 'mass_schedule':
+      return { templateType, scheduleKind: 'weekend', rows: [] };
+    case 'weekly_association':
+      return { templateType, names: [] };
+    case 'sanctuary_candle':
+      return { templateType, name: '', inMemoryOf: true };
+    case 'app_promo':
+      return { templateType, headline: 'Your Parish in Your Pocket', body: 'Mass readings. Livestreams. All in one app.', url: 'sainthelen.org/app' };
+  }
+}
+
+export function SlideEditor({ templateType, initialSlide }: SlideEditorProps) {
+  const router = useRouter();
+  const isNew = !initialSlide;
+
+  const [title, setTitle] = useState(initialSlide?.title ?? '');
+  const [content, setContent] = useState<SlideContent>(
+    (initialSlide?.content as SlideContent) ?? defaultContent(templateType),
+  );
+  const [scheduleType, setScheduleType] = useState<'evergreen' | 'dated'>(
+    initialSlide?.scheduleType ?? 'evergreen',
+  );
+  const [startDate, setStartDate] = useState(
+    initialSlide?.startAt ? new Date(initialSlide.startAt).toISOString().split('T')[0] : '',
+  );
+  const [startTime, setStartTime] = useState<TimeValue>({ hour: 12, minute: 0, period: 'AM' });
+  const [endDate, setEndDate] = useState(
+    initialSlide?.endAt ? new Date(initialSlide.endAt).toISOString().split('T')[0] : '',
+  );
+  const [endTime, setEndTime] = useState<TimeValue>({ hour: 11, minute: 59, period: 'PM' });
+  const [weight, setWeight] = useState(String(initialSlide?.weight ?? 1));
+  const [durationOverride, setDurationOverride] = useState(
+    initialSlide?.durationOverrideSec ? String(initialSlide.durationOverrideSec) : '',
+  );
+  const [active, setActive] = useState(initialSlide?.active ?? true);
+  const [saving, setSaving] = useState(false);
+  const [savedState, setSavedState] = useState<'idle' | 'saved' | 'error'>('idle');
+
+  const templateConfig = templates[templateType];
+
+  function buildBody() {
+    const body: Record<string, unknown> = {
+      title,
+      templateType,
+      content,
+      scheduleType,
+      active,
+      weight: parseFloat(weight) || 1,
+      durationOverrideSec: durationOverride ? parseInt(durationOverride) : null,
+    };
+
+    if (scheduleType === 'dated') {
+      if (startDate) {
+        const d = new Date(startDate);
+        let h = startTime.hour % 12;
+        if (startTime.period === 'PM') h += 12;
+        d.setHours(h, startTime.minute, 0, 0);
+        body.startAt = d.toISOString();
+      }
+      if (endDate) {
+        const d = new Date(endDate);
+        let h = endTime.hour % 12;
+        if (endTime.period === 'PM') h += 12;
+        d.setHours(h, endTime.minute, 0, 0);
+        body.endAt = d.toISOString();
+      }
+    } else {
+      body.startAt = null;
+      body.endAt = null;
+    }
+
+    return body;
+  }
+
+  async function handleSave() {
+    if (!title.trim()) {
+      toast.error('Title is required');
+      return;
+    }
+    setSaving(true);
+    setSavedState('idle');
+
+    try {
+      const body = buildBody();
+      let res: Response;
+
+      if (isNew) {
+        res = await fetch('/api/slides', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+      } else {
+        res = await fetch(`/api/slides/${initialSlide.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+      }
+
+      if (!res.ok) throw new Error(await res.text());
+
+      const saved = await res.json();
+      setSavedState('saved');
+      toast.success('Saved');
+
+      if (isNew) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        router.push(`/admin/slides/${saved.id}` as any);
+      }
+    } catch (err) {
+      setSavedState('error');
+      toast.error(`Couldn't save: ${err instanceof Error ? err.message : 'Unknown error'}`, {
+        action: { label: 'Retry', onClick: handleSave },
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const updateContent = useCallback((key: string, value: unknown) => {
+    setContent((prev) => ({ ...prev, [key]: value } as SlideContent));
+  }, []);
+
+  return (
+    <div>
+      {/* Sticky header */}
+      <div className="flex items-center justify-between mb-6 gap-4">
+        <div className="min-w-0">
+          <h1 className="text-xl font-serif font-bold text-navy truncate">
+            {isNew ? `New ${templateConfig.label}` : title || 'Untitled'}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {savedState === 'saved' ? 'Saved' : savedState === 'error' ? 'Error saving' : templateConfig.label}
+          </p>
+        </div>
+        <Button
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-rust hover:bg-rust-700 text-cream shrink-0"
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        {/* Left: Content form (60%) */}
+        <div className="lg:col-span-3 space-y-6">
+          <div className="space-y-1">
+            <Label htmlFor="title">Internal title (not shown on display)</Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Easter Mass Schedule 2025"
+              required
+            />
+          </div>
+
+          <Separator />
+
+          {/* Template-specific fields */}
+          <TemplateFields
+            templateType={templateType}
+            content={content}
+            onChange={(c) => setContent(c)}
+          />
+        </div>
+
+        {/* Right: Schedule + settings (40%) */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Active toggle */}
+          {!isNew && initialSlide && (
+            <div className="p-4 border border-border rounded-lg">
+              <ActiveToggle
+                slideId={initialSlide.id}
+                initialActive={active}
+                onToggle={setActive}
+              />
+            </div>
+          )}
+          {isNew && (
+            <div className="p-4 border border-border rounded-lg">
+              <div className="flex items-center gap-3">
+                <Switch checked={active} onCheckedChange={setActive} />
+                <Label>Active when saved</Label>
+              </div>
+            </div>
+          )}
+
+          {/* Schedule type */}
+          <div className="p-4 border border-border rounded-lg space-y-4">
+            <h3 className="font-medium text-sm">Schedule</h3>
+            <div className="flex gap-4">
+              {(['evergreen', 'dated'] as const).map((t) => (
+                <label key={t} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scheduleType"
+                    value={t}
+                    checked={scheduleType === t}
+                    onChange={() => setScheduleType(t)}
+                    className="accent-rust"
+                  />
+                  <span className="text-sm capitalize">{t}</span>
+                </label>
+              ))}
+            </div>
+
+            {scheduleType === 'dated' && (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Leave Start blank for &ldquo;starts now&rdquo;. Leave End blank to run forever once started.
+                </p>
+                <div className="space-y-1">
+                  <Label className="text-xs">Start date</Label>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                  <TimePicker value={startTime} onChange={setStartTime} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">End date (optional)</Label>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                  <TimePicker value={endTime} onChange={setEndTime} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Weight + duration */}
+          <div className="p-4 border border-border rounded-lg space-y-4">
+            <h3 className="font-medium text-sm">Rotation</h3>
+            <div className="space-y-1">
+              <Label className="text-xs">
+                Weight (default {templateConfig.defaultWeight})
+              </Label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min="0"
+                  max="3"
+                  step="0.1"
+                  value={weight}
+                  onChange={(e) => setWeight(e.target.value)}
+                  className="flex-1 accent-rust"
+                />
+                <span className="text-sm font-mono w-8 text-right">{weight}</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">
+                Duration override (sec) — empty inherits {templateConfig.defaultDurationSec}s
+              </Label>
+              <Input
+                type="number"
+                min="5"
+                max="120"
+                value={durationOverride}
+                onChange={(e) => setDurationOverride(e.target.value)}
+                placeholder={`${templateConfig.defaultDurationSec}`}
+              />
+            </div>
+          </div>
+
+          {/* Preview link */}
+          {!isNew && initialSlide && (
+            <a
+              href={`/display/__preview?slideId=${initialSlide.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-center text-sm text-navy underline py-2"
+            >
+              Preview at full size ↗
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Template-specific content forms ─────────────────────────────────────────
+
+interface TemplateFieldsProps {
+  templateType: TemplateKey;
+  content: SlideContent;
+  onChange: (c: SlideContent) => void;
+}
+
+function TemplateFields({ templateType, content, onChange }: TemplateFieldsProps) {
+  function set(key: string, value: unknown) {
+    onChange({ ...content, [key]: value } as SlideContent);
+  }
+
+  switch (templateType) {
+    case 'parish_identity': {
+      const c = content as Extract<SlideContent, { templateType: 'parish_identity' }>;
+      return (
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <Label>Headline</Label>
+            <Input value={c.headline} onChange={(e) => set('headline', e.target.value)} placeholder="Saint Helen Parish" />
+          </div>
+          <div className="space-y-1">
+            <Label>Subline (optional)</Label>
+            <Input value={c.subline ?? ''} onChange={(e) => set('subline', e.target.value)} placeholder="A Community of Faith" />
+          </div>
+        </div>
+      );
+    }
+
+    case 'welcome_quote': {
+      const c = content as Extract<SlideContent, { templateType: 'welcome_quote' }>;
+      return (
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <Label>Quote</Label>
+            <Textarea rows={4} value={c.quote} onChange={(e) => set('quote', e.target.value)} placeholder="Come to me, all you who are weary…" />
+          </div>
+          <div className="space-y-1">
+            <Label>Attribution (optional)</Label>
+            <Input value={c.attribution ?? ''} onChange={(e) => set('attribution', e.target.value)} placeholder="Matthew 11:28" />
+          </div>
+        </div>
+      );
+    }
+
+    case 'general': {
+      const c = content as Extract<SlideContent, { templateType: 'general' }>;
+      return (
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <Label>Headline</Label>
+            <Input value={c.headline} onChange={(e) => set('headline', e.target.value)} placeholder="Event or announcement title" />
+          </div>
+          <div className="space-y-1">
+            <Label>Body</Label>
+            <Textarea rows={5} value={c.body} onChange={(e) => set('body', e.target.value)} placeholder="Description of the event or announcement" />
+          </div>
+          <div className="space-y-1">
+            <Label>Meta line (optional)</Label>
+            <Input value={c.meta ?? ''} onChange={(e) => set('meta', e.target.value)} placeholder="Sunday, October 12 at 7 PM in Meaney Hall" />
+          </div>
+          <div className="space-y-1">
+            <Label>Headline animation</Label>
+            <select
+              value={c.motionStyle ?? 'lineMask'}
+              onChange={(e) => set('motionStyle', e.target.value)}
+              className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+            >
+              <option value="lineMask">Line mask (curtain reveal)</option>
+              <option value="splitReveal">Split reveal (dramatic)</option>
+            </select>
+          </div>
+        </div>
+      );
+    }
+
+    case 'mass_schedule': {
+      const c = content as Extract<SlideContent, { templateType: 'mass_schedule' }>;
+      return (
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <Label>Schedule type</Label>
+            <div className="flex gap-4">
+              {(['weekend', 'weekday'] as const).map((k) => (
+                <label key={k} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={c.scheduleKind === k}
+                    onChange={() => set('scheduleKind', k)}
+                    className="accent-rust"
+                  />
+                  <span className="text-sm capitalize">{k}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <PasteParser
+            templateType={c.scheduleKind === 'weekend' ? 'mass_schedule_weekend' : 'mass_schedule_weekday'}
+            savedRows={c.rows.map((r) => ({ ...r, needsReview: false }))}
+            onParsed={(rows) => set('rows', rows.map(({ needsReview: _, ...r }) => r) as MassScheduleRow[])}
+          />
+        </div>
+      );
+    }
+
+    case 'weekly_association': {
+      const c = content as Extract<SlideContent, { templateType: 'weekly_association' }>;
+      return (
+        <PasteParser
+          templateType="weekly_association"
+          savedRows={c.names.map((name) => ({ name, needsReview: false }))}
+          onParsed={(rows) => set('names', (rows as { name: string }[]).map((r) => r.name))}
+        />
+      );
+    }
+
+    case 'sanctuary_candle': {
+      const c = content as Extract<SlideContent, { templateType: 'sanctuary_candle' }>;
+      return (
+        <div className="space-y-4">
+          <PasteParser
+            templateType="sanctuary_candle"
+            savedRows={c.name ? [{ name: c.name, needsReview: false }] : []}
+            onParsed={(rows) => {
+              const first = (rows as { name: string }[])[0];
+              if (first) set('name', first.name);
+            }}
+          />
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={c.inMemoryOf ?? true}
+              onCheckedChange={(v) => set('inMemoryOf', v)}
+            />
+            <Label>{c.inMemoryOf ? 'In Memory Of' : 'In Honor Of'}</Label>
+          </div>
+        </div>
+      );
+    }
+
+    case 'app_promo': {
+      const c = content as Extract<SlideContent, { templateType: 'app_promo' }>;
+      return (
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <Label>Headline</Label>
+            <Input value={c.headline} onChange={(e) => set('headline', e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>Body</Label>
+            <Textarea rows={3} value={c.body} onChange={(e) => set('body', e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>URL</Label>
+            <Input value={c.url} onChange={(e) => set('url', e.target.value)} placeholder="sainthelen.org/app" />
+          </div>
+        </div>
+      );
+    }
+  }
+}

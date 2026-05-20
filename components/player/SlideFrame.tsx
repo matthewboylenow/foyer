@@ -3,14 +3,11 @@
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
-const EXIT_EASING: [number, number, number, number] = [0.7, 0, 0.84, 0];
-
 interface SlideFrameProps {
   children: React.ReactNode;
   slideId: string;
   holdMs: number;
   enterMs?: number;
-  exitMs?: number;
   onDone: () => void;
 }
 
@@ -19,7 +16,6 @@ export function SlideFrame({
   slideId,
   holdMs,
   enterMs = 1200,
-  exitMs = 500,
   onDone,
 }: SlideFrameProps) {
   const onDoneRef = useRef(onDone);

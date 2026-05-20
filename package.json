@@ -44,6 +44,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
@@ -51,6 +52,8 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@typescript-eslint/eslint-plugin": "^8.59.4",
+    "@typescript-eslint/parser": "^8.59.4",
     "@vitejs/plugin-react": "^6.0.2",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
@@ -60,6 +63,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.22.3",
     "typescript": "^5",
+    "typescript-eslint": "^8.59.4",
     "vitest": "^4.1.6"
   }
 }

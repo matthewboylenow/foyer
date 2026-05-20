@@ -1,10 +1,14 @@
 import bcrypt from 'bcryptjs';
-import { Resend } from 'resend';
 import { eq, and, isNull, gte, desc } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { otpCodes } from '@/lib/db/schema';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  const { Resend } = require('resend') as typeof import('resend');
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error('RESEND_API_KEY is not set');
+  return new Resend(key);
+}
 
 function generateSixDigitCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -21,6 +25,7 @@ export async function sendOtp(email: string): Promise<void> {
   });
 
   const from = process.env.EMAIL_FROM ?? 'Saint Helen Signage <no-reply@sainthelen.org>';
+  const resend = getResend();
 
   await resend.emails.send({
     from,
