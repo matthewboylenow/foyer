@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx lib/db/seed.ts",
+    "db:seed": "sh -c 'DATABASE_URL=$(grep \"^DATABASE_URL=\" .env.local | cut -d= -f2-) tsx lib/db/seed.ts'",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
