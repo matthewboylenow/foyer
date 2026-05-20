@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { LineMask } from '@/components/motion/LineMask';
 import { WordStagger } from '@/components/motion/WordStagger';
 import { GradientShift } from '@/components/motion/GradientShift';
+import { APP_PROMO_HEADLINE_SIZE, resolveSize } from './sizing';
 import type { AppPromoContent } from '@/lib/db/schema';
 
 interface AppPromoProps {
@@ -12,23 +13,20 @@ interface AppPromoProps {
 }
 
 export function AppPromo({ content, phoneMockupUrl }: AppPromoProps) {
-  const { headline, body, url } = content;
+  const { headline, body, url, headlineSize } = content;
+  const headlinePx = resolveSize(APP_PROMO_HEADLINE_SIZE, headlineSize);
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-navy-900">
-      {/* Animated navy→deep-purple gradient */}
       <GradientShift colors={['#1F346D', '#2D1B69']} duration={20000} pattern="shift" />
-
-      {/* Grain */}
       <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.04 }} />
 
       <div
         className="relative z-10 flex flex-col justify-between h-full"
         style={{ padding: '120px 80px' }}
       >
-        {/* Top: headline + body */}
         <div>
-          <h2 className="font-serif text-cream leading-tight mb-8" style={{ fontSize: 140 }}>
+          <h2 className="font-serif text-cream leading-tight mb-8" style={{ fontSize: headlinePx }}>
             <LineMask text={headline} delay={0} duration={900} />
           </h2>
           <p className="font-sans text-cream leading-relaxed" style={{ fontSize: 48, opacity: 0.8 }}>
@@ -36,7 +34,6 @@ export function AppPromo({ content, phoneMockupUrl }: AppPromoProps) {
           </p>
         </div>
 
-        {/* Middle: phone mockup */}
         {phoneMockupUrl && (
           <motion.div
             className="flex items-center justify-center"
@@ -58,7 +55,6 @@ export function AppPromo({ content, phoneMockupUrl }: AppPromoProps) {
           </motion.div>
         )}
 
-        {/* Bottom: URL */}
         <motion.p
           className="font-serif text-gold"
           style={{ fontSize: 64 }}

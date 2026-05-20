@@ -2,6 +2,7 @@
 
 import { motion } from 'motion/react';
 import { WordStagger } from '@/components/motion/WordStagger';
+import { SANCTUARY_CANDLE_NAME_SIZE, resolveSize } from './sizing';
 import type { SanctuaryCandleContent } from '@/lib/db/schema';
 
 interface SanctuaryCandleProps {
@@ -9,8 +10,9 @@ interface SanctuaryCandleProps {
 }
 
 export function SanctuaryCandle({ content }: SanctuaryCandleProps) {
-  const { name, inMemoryOf = true } = content;
+  const { name, inMemoryOf = true, nameSize } = content;
   const captionLine = inMemoryOf ? 'In Memory Of' : 'In Honor Of';
+  const namePx = resolveSize(SANCTUARY_CANDLE_NAME_SIZE, nameSize);
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-ink">
@@ -107,7 +109,7 @@ export function SanctuaryCandle({ content }: SanctuaryCandleProps) {
         </motion.div>
 
         {/* Name */}
-        <div className="font-serif text-cream leading-tight" style={{ fontSize: 140 }}>
+        <div className="font-serif text-cream leading-tight" style={{ fontSize: namePx }}>
           <WordStagger text={name} delay={1800} staggerMs={120} />
         </div>
       </div>

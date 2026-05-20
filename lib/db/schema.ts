@@ -154,23 +154,29 @@ export const auditLog = pgTable('audit_log', {
 
 // ─── TypeScript content types per template ───────────────────────────────────
 
+export type SizePreset = 'small' | 'medium' | 'large';
+
 export type ParishIdentityContent = {
   templateType: 'parish_identity';
   logoMediaId?: string;
+  logoSize?: SizePreset;          // default: 'medium'
   headline: string;
-  subline?: string;
+  headlineSize?: SizePreset;      // default: 'medium'
+  subline?: string;                // HTML from RichTextEditor (or plain text)
 };
 
 export type WelcomeQuoteContent = {
   templateType: 'welcome_quote';
   quote: string;
+  quoteSize?: SizePreset;          // default: 'medium'
   attribution?: string;
 };
 
 export type GeneralContent = {
   templateType: 'general';
   headline: string;
-  body: string;
+  headlineSize?: SizePreset;       // default: 'medium'
+  body: string;                     // HTML from RichTextEditor
   meta?: string;
   bgImageMediaId?: string;
   motionStyle?: 'splitReveal' | 'lineMask';
@@ -195,12 +201,14 @@ export type WeeklyAssociationContent = {
 export type SanctuaryCandleContent = {
   templateType: 'sanctuary_candle';
   name: string;
+  nameSize?: SizePreset;           // default: 'medium'
   inMemoryOf?: boolean;
 };
 
 export type AppPromoContent = {
   templateType: 'app_promo';
   headline: string;
+  headlineSize?: SizePreset;       // default: 'medium'
   body: string;
   url: string;
   phoneMockupMediaId?: string;

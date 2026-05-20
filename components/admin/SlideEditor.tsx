@@ -14,9 +14,11 @@ import { TimePicker } from './TimePicker';
 import { PasteParser } from './PasteParser';
 import { LivePreview } from './LivePreview';
 import { ImageUpload } from './ImageUpload';
+import { SizeButtons } from './SizeButtons';
+import { RichTextEditor } from './RichTextEditor';
 import { templates } from '@/components/templates';
 import type { TemplateKey } from '@/components/templates';
-import type { SlideWithContent, SlideContent, MassScheduleRow } from '@/lib/db/schema';
+import type { SlideWithContent, SlideContent, MassScheduleRow, SizePreset } from '@/lib/db/schema';
 import type { TimeValue } from '@/lib/time';
 
 interface SlideEditorProps {
@@ -392,12 +394,26 @@ function TemplateFields({
             <Label>Headline</Label>
             <Input value={c.headline} onChange={(e) => set('headline', e.target.value)} placeholder="Saint Helen Parish" />
           </div>
+          <SizeButtons
+            label="Headline size"
+            value={c.headlineSize}
+            onChange={(v: SizePreset) => set('headlineSize', v)}
+          />
           <div className="space-y-1">
             <Label>Subline (optional)</Label>
-            <Input value={c.subline ?? ''} onChange={(e) => set('subline', e.target.value)} placeholder="A Community of Faith" />
+            <RichTextEditor
+              value={c.subline ?? ''}
+              onChange={(html) => set('subline', html)}
+              placeholder="A Community of Faith"
+              toolbar="none"
+              rows={2}
+            />
+            <p className="text-xs text-muted-foreground">
+              Press Enter for a new line. Shift+Enter for a soft break.
+            </p>
           </div>
           <p className="text-xs text-muted-foreground">
-            Uses the tenant logo from Settings by default. Upload a different logo here to override on this slide only.
+            Logo uses the tenant default from Settings unless overridden here.
           </p>
           <ImageUpload
             label="Slide-specific logo (optional)"
@@ -412,6 +428,11 @@ function TemplateFields({
               onSlideLogoChange(null);
             }}
           />
+          <SizeButtons
+            label="Logo size"
+            value={c.logoSize}
+            onChange={(v: SizePreset) => set('logoSize', v)}
+          />
         </div>
       );
     }
@@ -424,6 +445,11 @@ function TemplateFields({
             <Label>Quote</Label>
             <Textarea rows={4} value={c.quote} onChange={(e) => set('quote', e.target.value)} placeholder="Come to me, all you who are weary…" />
           </div>
+          <SizeButtons
+            label="Quote size"
+            value={c.quoteSize}
+            onChange={(v: SizePreset) => set('quoteSize', v)}
+          />
           <div className="space-y-1">
             <Label>Attribution (optional)</Label>
             <Input value={c.attribution ?? ''} onChange={(e) => set('attribution', e.target.value)} placeholder="Matthew 11:28" />
@@ -440,13 +466,27 @@ function TemplateFields({
             <Label>Headline</Label>
             <Input value={c.headline} onChange={(e) => set('headline', e.target.value)} placeholder="Event or announcement title" />
           </div>
+          <SizeButtons
+            label="Headline size"
+            value={c.headlineSize}
+            onChange={(v: SizePreset) => set('headlineSize', v)}
+          />
           <div className="space-y-1">
-            <Label>Body</Label>
-            <Textarea rows={5} value={c.body} onChange={(e) => set('body', e.target.value)} placeholder="Description of the event or announcement" />
+            <Label>Meta line (date, time, location — appears between headline and body)</Label>
+            <Input value={c.meta ?? ''} onChange={(e) => set('meta', e.target.value)} placeholder="Sunday, October 12 at 7 PM in Meaney Hall" />
           </div>
           <div className="space-y-1">
-            <Label>Meta line (optional)</Label>
-            <Input value={c.meta ?? ''} onChange={(e) => set('meta', e.target.value)} placeholder="Sunday, October 12 at 7 PM in Meaney Hall" />
+            <Label>Body</Label>
+            <RichTextEditor
+              value={c.body}
+              onChange={(html) => set('body', html)}
+              placeholder="Description of the event or announcement"
+              toolbar="full"
+              rows={6}
+            />
+            <p className="text-xs text-muted-foreground">
+              Bold, italic, and bullet lists supported. Press Enter for paragraphs, Shift+Enter for line breaks.
+            </p>
           </div>
           <div className="space-y-1">
             <Label>Headline animation</Label>
@@ -528,6 +568,11 @@ function TemplateFields({
               if (first) set('name', first.name);
             }}
           />
+          <SizeButtons
+            label="Name size"
+            value={c.nameSize}
+            onChange={(v: SizePreset) => set('nameSize', v)}
+          />
           <div className="flex items-center gap-3">
             <Switch
               checked={c.inMemoryOf ?? true}
@@ -547,6 +592,11 @@ function TemplateFields({
             <Label>Headline</Label>
             <Input value={c.headline} onChange={(e) => set('headline', e.target.value)} />
           </div>
+          <SizeButtons
+            label="Headline size"
+            value={c.headlineSize}
+            onChange={(v: SizePreset) => set('headlineSize', v)}
+          />
           <div className="space-y-1">
             <Label>Body</Label>
             <Textarea rows={3} value={c.body} onChange={(e) => set('body', e.target.value)} />
