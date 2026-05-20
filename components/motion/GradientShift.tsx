@@ -33,20 +33,30 @@ export function GradientShift({
   }
 
   if (pattern === 'shift') {
+    // Was animating `backgroundPosition` — forces full repaint each tick on
+    // weak GPUs. Now translate an oversized gradient layer, which the
+    // compositor can promote and accelerate.
     return (
-      <motion.div
-        className={`absolute inset-0 ${className ?? ''}`}
-        style={{
-          background: `linear-gradient(135deg, ${c1} 0%, ${c2} 50%, ${c1} 100%)`,
-          backgroundSize: '200% 200%',
-        }}
-        animate={{ backgroundPosition: ['0% 0%', '100% 100%', '0% 0%'] }}
-        transition={{
-          duration: duration / 1000,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
-      />
+      <div
+        className={`absolute inset-0 overflow-hidden ${className ?? ''}`}
+        style={{ background: c2 }}
+      >
+        <motion.div
+          className="absolute"
+          style={{
+            inset: '-25%',
+            background: `linear-gradient(135deg, ${c1} 0%, ${c2} 50%, ${c1} 100%)`,
+            willChange: 'transform',
+          }}
+          initial={{ x: '-10%', y: '-10%' }}
+          animate={{ x: ['-10%', '10%', '-10%'], y: ['-10%', '10%', '-10%'] }}
+          transition={{
+            duration: duration / 1000,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
+      </div>
     );
   }
 

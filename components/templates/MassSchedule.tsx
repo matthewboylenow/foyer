@@ -36,8 +36,8 @@ interface MassRowProps {
 
 function MassRow({ row, delay, timeSize, intentionSize }: MassRowProps) {
   const t = { duration: 0.8, delay: delay / 1000, ease: EASING };
-  const enter = { opacity: 0, y: 6, filter: 'blur(5px)' } as const;
-  const settled = { opacity: 1, y: 0, filter: 'blur(0px)' } as const;
+  const enter = { opacity: 0, y: 6 } as const;
+  const settled = { opacity: 1, y: 0 } as const;
 
   return (
     <>
@@ -78,8 +78,8 @@ function SectionTitle({ text, delay }: SectionTitleProps) {
     <motion.p
       className="col-span-2 font-sans text-rust uppercase tracking-widest text-left"
       style={{ fontSize: 22 }}
-      initial={{ opacity: 0, y: 6, filter: 'blur(5px)' }}
-      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8, delay: delay / 1000, ease: EASING }}
     >
       {text}

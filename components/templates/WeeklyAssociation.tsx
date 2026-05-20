@@ -13,17 +13,14 @@ export function WeeklyAssociation({ content }: { content: WeeklyAssociationConte
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-cream">
-      {/* Warm breathing background */}
-      <motion.div
+      {/* Warm static accent. Was animating the `background` property which
+          forced a full-frame repaint each tick — punishing on signage GPUs. */}
+      <div
         className="absolute inset-0"
-        animate={{
-          background: [
-            'radial-gradient(ellipse at 50% 70%, rgba(205,83,52,0.06) 0%, transparent 60%)',
-            'radial-gradient(ellipse at 50% 75%, rgba(205,83,52,0.08) 0%, transparent 65%)',
-            'radial-gradient(ellipse at 50% 70%, rgba(205,83,52,0.06) 0%, transparent 60%)',
-          ],
+        style={{
+          background:
+            'radial-gradient(ellipse at 50% 72%, rgba(205,83,52,0.07) 0%, transparent 62%)',
         }}
-        transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
       />
 
       <FilmGrain opacity={0.04} />

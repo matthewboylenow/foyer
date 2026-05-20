@@ -14,18 +14,14 @@ export function WelcomeQuote({ content }: { content: WelcomeQuoteContent }) {
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-cream">
-      {/* Warm breathing background */}
-      <motion.div
+      {/* Warm static accent. Was animating the `background` property which
+          forced a full-frame repaint each tick — punishing on signage GPUs. */}
+      <div
         className="absolute inset-0"
-        animate={{
-          background: [
-            'radial-gradient(ellipse at 50% 40%, rgba(212,175,55,0.08) 0%, transparent 65%)',
-            'radial-gradient(ellipse at 55% 50%, rgba(212,175,55,0.10) 0%, transparent 70%)',
-            'radial-gradient(ellipse at 45% 45%, rgba(212,175,55,0.06) 0%, transparent 65%)',
-            'radial-gradient(ellipse at 50% 40%, rgba(212,175,55,0.08) 0%, transparent 65%)',
-          ],
+        style={{
+          background:
+            'radial-gradient(ellipse at 50% 42%, rgba(212,175,55,0.08) 0%, transparent 66%)',
         }}
-        transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
       />
 
       {/* Soft rust accent low */}

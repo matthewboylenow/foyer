@@ -1,9 +1,5 @@
 'use client';
 
-import { motion } from 'motion/react';
-
-const EASING: [number, number, number, number] = [0.16, 1, 0.3, 1];
-
 interface WordStaggerProps {
   text: string;
   delay?: number;
@@ -11,26 +7,23 @@ interface WordStaggerProps {
   className?: string;
 }
 
+// Pure CSS stagger — was previously one framer-motion instance per word,
+// which meant 10+ JS-driven rAF loops on every text headline. The CSS
+// keyframe is defined in globals.css (`@keyframes word-stagger-rise`).
 export function WordStagger({ text, delay = 0, staggerMs = 80, className }: WordStaggerProps) {
   const words = text.split(' ').filter(Boolean);
 
   return (
     <span className={className} aria-label={text}>
       {words.map((word, i) => (
-        <motion.span
+        <span
           key={i}
-          className="inline-block"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            duration: 0.6,
-            delay: delay / 1000 + (i * staggerMs) / 1000,
-            ease: EASING,
-          }}
+          className="word-stagger inline-block"
+          style={{ animationDelay: `${delay + i * staggerMs}ms` }}
         >
           {word}
           {i < words.length - 1 ? ' ' : ''}
-        </motion.span>
+        </span>
       ))}
     </span>
   );
