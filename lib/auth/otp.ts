@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { eq, and, isNull, gte, desc } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { otpCodes } from '@/lib/db/schema';
+import { getDefaultTenant, getSettingsByTenant } from '@/lib/db/queries';
 
 function getResend() {
   const { Resend } = require('resend') as typeof import('resend');
@@ -24,9 +25,23 @@ export async function sendOtp(email: string): Promise<void> {
     expiresAt: new Date(Date.now() + 10 * 60 * 1000),
   });
 
-  // Strip surrounding quotes if env var was set with literal quotes (common in dashboards)
-  const fromRaw = process.env.EMAIL_FROM ?? 'Saint Helen Signage <no-reply@sending.sainthelen.org>';
-  const from = fromRaw.trim().replace(/^["']|["']$/g, '');
+  // Resolve the "from" address. Per-tenant override wins (configured in
+  // /admin/settings); falls back to EMAIL_FROM env var; final fallback is
+  // the original Saint Helen address so existing dev/prod keeps working.
+  const tenant = await getDefaultTenant();
+  const tenantSettings = tenant ? await getSettingsByTenant(tenant.id) : null;
+  const tenantFromName = tenantSettings?.emailFromName?.trim();
+  const tenantFromAddr = tenantSettings?.emailFromAddress?.trim();
+  let from: string;
+  if (tenantFromName && tenantFromAddr) {
+    from = `${tenantFromName} <${tenantFromAddr}>`;
+  } else if (tenantFromAddr) {
+    from = tenantFromAddr;
+  } else {
+    const fromRaw =
+      process.env.EMAIL_FROM ?? 'Saint Helen Signage <no-reply@sending.sainthelen.org>';
+    from = fromRaw.trim().replace(/^["']|["']$/g, '');
+  }
   const resend = getResend();
 
   await resend.emails.send({

@@ -10,6 +10,7 @@ import {
   Monitor,
   Activity,
   AlertTriangle,
+  Users as UsersIcon,
   Settings as SettingsIcon,
   Menu,
   X,
@@ -29,6 +30,7 @@ interface NavLink {
     | '/admin/displays'
     | '/admin/audit'
     | '/admin/errors'
+    | '/admin/users'
     | '/admin/settings';
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
@@ -40,6 +42,7 @@ const NAV_LINKS: NavLink[] = [
   { href: '/admin/displays', label: 'Displays', icon: Monitor },
   { href: '/admin/audit', label: 'Activity', icon: Activity },
   { href: '/admin/errors', label: 'Errors', icon: AlertTriangle },
+  { href: '/admin/users', label: 'Users', icon: UsersIcon },
   { href: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ];
 

@@ -8,7 +8,7 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Email is required' }, { status: 400 });
     }
 
-    if (!isAllowedEmail(email)) {
+    if (!(await isAllowedEmail(email))) {
       // Return 200 with a generic message to avoid user enumeration
       return Response.json({ ok: true });
     }

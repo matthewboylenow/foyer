@@ -1,4 +1,5 @@
 import { Player } from '@/components/player/Player';
+import { TenantTheme } from '@/components/TenantTheme';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,5 +9,9 @@ export default async function DisplayPage({
   params: Promise<{ displayId: string }>;
 }) {
   const { displayId } = await params;
-  return <Player displayId={displayId} />;
+  return (
+    <TenantTheme>
+      <Player displayId={displayId} />
+    </TenantTheme>
+  );
 }

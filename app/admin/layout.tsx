@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth/config';
 import { AdminNav } from '@/components/admin/AdminNav';
 import { AdminPageTransition } from '@/components/admin/AdminPageTransition';
+import { TenantTheme } from '@/components/TenantTheme';
 
 // Admin pages must always reflect the latest DB state — no CDN caching of HTML.
 export const dynamic = 'force-dynamic';
@@ -14,13 +15,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="min-h-screen bg-cream">
-      <AdminNav user={session?.user ?? null} />
-      <main className="lg:ml-56 px-4 sm:px-8 py-8 min-h-screen">
-        <div className="max-w-7xl mx-auto">
-          <AdminPageTransition>{children}</AdminPageTransition>
-        </div>
-      </main>
-    </div>
+    <TenantTheme>
+      <div className="min-h-screen bg-cream">
+        <AdminNav user={session?.user ?? null} />
+        <main className="lg:ml-56 px-4 sm:px-8 py-8 min-h-screen">
+          <div className="max-w-7xl mx-auto">
+            <AdminPageTransition>{children}</AdminPageTransition>
+          </div>
+        </main>
+      </div>
+    </TenantTheme>
   );
 }

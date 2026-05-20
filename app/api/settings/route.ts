@@ -19,6 +19,15 @@ export async function PATCH(req: Request) {
   if ('videoEnabled' in body) update.videoEnabled = body.videoEnabled;
   if ('missionStatement' in body) update.missionStatement = body.missionStatement;
   if ('logoMediaId' in body) update.logoMediaId = body.logoMediaId;
+  // Per-tenant palette — accepted as hex strings, validated lightly.
+  for (const key of ['primaryColor', 'accentColor', 'creamColor', 'goldColor'] as const) {
+    if (key in body && typeof body[key] === 'string' && /^#[0-9a-fA-F]{6}$/.test(body[key])) {
+      update[key] = body[key];
+    }
+  }
+  // Per-tenant email "from" name + address.
+  if ('emailFromName' in body) update.emailFromName = body.emailFromName;
+  if ('emailFromAddress' in body) update.emailFromAddress = body.emailFromAddress;
 
   const [updated] = await db
     .update(settings)

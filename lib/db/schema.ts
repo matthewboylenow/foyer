@@ -78,6 +78,13 @@ export const settings = pgTable('settings', {
   accentColor: text('accent_color').default('#CD5334').notNull(),
   creamColor: text('cream_color').default('#FAF9F7').notNull(),
   goldColor: text('gold_color').default('#D4AF37').notNull(),
+  /** Per-tenant Resend "from" address. When null we fall back to EMAIL_FROM env. */
+  emailFromName: text('email_from_name'),
+  emailFromAddress: text('email_from_address'),
+  /** Wildcard email domain that auto-grants access (e.g. 'sainthelen.org'
+   *  — any @sainthelen.org address can sign in without being individually
+   *  invited). Per-tenant override of the v1.0 hardcoded STAFF_DOMAINS list. */
+  allowedDomain: text('allowed_domain'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -174,6 +181,24 @@ export const otpCodes = pgTable('otp_codes', {
   attempts: integer('attempts').default(0).notNull(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   consumedAt: timestamp('consumed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Tenant-scoped allowlist + role. Replaces the v1.0 hardcoded
+ * lib/auth/allowlist.ts. An email may sign in to a tenant if it appears
+ * here OR if its domain matches settings.allowedDomain.
+ *
+ * Roles:
+ *   - 'owner'  : full admin including managing the user list
+ *   - 'editor' : everything except managing other users
+ */
+export const tenantUsers = pgTable('tenant_users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  role: text('role').default('editor').notNull(),
+  addedBy: text('added_by'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -322,6 +347,8 @@ export type Slide = typeof slides.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type AuditLogEntry = typeof auditLog.$inferSelect;
 export type Collection = typeof collections.$inferSelect;
+export type TenantUser = typeof tenantUsers.$inferSelect;
+export type TenantUserRole = 'owner' | 'editor';
 export type CollectionColor =
   | 'rust'
   | 'gold'
