@@ -43,6 +43,14 @@ export const displays = pgTable('displays', {
   name: text('name').notNull(),
   location: text('location'),
   active: boolean('active').default(true).notNull(),
+  /** ID of the slide the player last reported as currently visible. Null
+   *  if the player has never heart-beat (new display) or after a wipe. */
+  currentSlideId: uuid('current_slide_id'),
+  /** When the current slide became visible. Used to show "on screen for 12s". */
+  currentSlideStartedAt: timestamp('current_slide_started_at', { withTimezone: true }),
+  /** Last time we heard from the player at all. Drives the online/offline
+   *  dot in the admin Displays view. */
+  lastHeartbeatAt: timestamp('last_heartbeat_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

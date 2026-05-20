@@ -175,6 +175,57 @@ export function Player({ displayId }: PlayerProps) {
     return () => clearInterval(interval);
   }, []);
 
+  // Heartbeat — tell the admin what's currently on screen. Fires on every
+  // slide change AND every 60s as a liveness ping (so an idle TV stuck on
+  // the same slide still reads as "online" in the admin).
+  useEffect(() => {
+    if (!ready || pool.length === 0) return;
+    const current = pool[currentIndex];
+    if (!current) return;
+
+    const payload = JSON.stringify({ slideId: current.id });
+    const url = `/api/display/${displayId}/heartbeat`;
+
+    // Use sendBeacon when available — it survives page navigation/unload
+    // and doesn't block. Fall back to fetch.
+    try {
+      if (navigator.sendBeacon) {
+        const blob = new Blob([payload], { type: 'application/json' });
+        navigator.sendBeacon(url, blob);
+      } else {
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+          keepalive: true,
+        }).catch(() => {
+          /* network blip — next slide change will retry */
+        });
+      }
+    } catch {
+      /* sendBeacon can throw on some Tizen builds — swallow */
+    }
+
+    const ping = setInterval(() => {
+      try {
+        if (navigator.sendBeacon) {
+          const blob = new Blob([payload], { type: 'application/json' });
+          navigator.sendBeacon(url, blob);
+        } else {
+          fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true,
+          }).catch(() => {});
+        }
+      } catch {
+        /* swallow */
+      }
+    }, 60_000);
+    return () => clearInterval(ping);
+  }, [currentIndex, pool, ready, displayId]);
+
   const handleSlideDone = useCallback(() => {
     setCurrentIndex((prev) => {
       const next = prev + 1;
