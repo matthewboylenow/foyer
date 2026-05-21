@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { formatDistanceToNow } from 'date-fns';
+import { TimeAgo } from './TimeAgo';
 import {
   ChevronDown,
   ChevronRight,
@@ -138,14 +138,23 @@ interface FlatDiff {
   to: unknown;
 }
 
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v) && !(v instanceof Date);
+}
+
 function flattenDiff(diff: ObjectDiff, prefix = ''): FlatDiff[] {
   const out: FlatDiff[] = [];
   for (const [k, v] of Object.entries(diff)) {
     const key = prefix ? `${prefix}.${k}` : k;
     if (isFieldDiff(v)) {
       out.push({ key, leafLabel: fieldLabel(k), from: v.from, to: v.to });
-    } else {
+    } else if (isPlainObject(v)) {
       out.push(...flattenDiff(v as ObjectDiff, key));
+    } else {
+      // Malformed diff (primitive at a non-leaf position). Render as a
+      // best-effort leaf so the row still shows up instead of crashing —
+      // and so we'd notice it in QA.
+      out.push({ key, leafLabel: fieldLabel(k), from: null, to: v });
     }
   }
   return out;
@@ -261,9 +270,10 @@ export function AuditList({ entries, slideTitles }: Props) {
                         )}
                       </>
                     )}
-                    <span className="text-[11px] text-navy/45 ml-auto font-mono">
-                      {formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true })}
-                    </span>
+                    <TimeAgo
+                      date={entry.createdAt}
+                      className="text-[11px] text-navy/45 ml-auto font-mono"
+                    />
                   </div>
                   <div className="mt-1 flex items-center gap-2 text-[11px] text-navy/55">
                     <span>{entry.userEmail ?? 'system'}</span>

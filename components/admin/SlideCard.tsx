@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { formatDistanceToNow } from 'date-fns';
+import { TimeAgo } from './TimeAgo';
 import { MoreHorizontal, GripVertical, Calendar, CheckCircle2 } from 'lucide-react';
 import { templates } from '@/components/templates';
 import {
@@ -204,9 +204,10 @@ export function SlideCard({
         <div className="flex items-center gap-2 mt-2 text-[11px] text-navy/55">
           <Calendar size={11} className="shrink-0" />
           <span className="truncate">{scheduleLabel}</span>
-          <span className="ml-auto shrink-0 font-mono text-navy/40">
-            {formatDistanceToNow(new Date(slide.updatedAt), { addSuffix: true })}
-          </span>
+          <TimeAgo
+            date={slide.updatedAt}
+            className="ml-auto shrink-0 font-mono text-navy/40"
+          />
         </div>
       </div>
     </div>

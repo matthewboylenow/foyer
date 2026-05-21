@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import { TimeAgo } from './TimeAgo';
 import { Trash2, ShieldCheck, User as UserIcon, Plus } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { Button } from '@/components/ui/button';
@@ -147,9 +147,7 @@ export function UsersList({ users: initial, allowedDomain }: Props) {
                       </button>
                     </td>
                     <td className="px-4 py-3 text-navy/55 text-xs">
-                      <span title={new Date(u.createdAt).toLocaleString()}>
-                        {formatDistanceToNow(new Date(u.createdAt), { addSuffix: true })}
-                      </span>
+                      <TimeAgo date={u.createdAt} />
                       {u.addedBy && (
                         <div className="text-navy/40 text-[10px]">by {u.addedBy}</div>
                       )}

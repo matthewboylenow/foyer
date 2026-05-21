@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import { TimeAgo } from './TimeAgo';
 import { ChevronDown, ChevronRight, AlertTriangle, Monitor, LayoutGrid, Server } from 'lucide-react';
 
 interface ErrorRow {
@@ -119,9 +119,10 @@ export function ErrorsList({ errors, displayNames, slideTitles }: Props) {
                         <LayoutGrid size={11} /> {slideLabel}
                       </span>
                     )}
-                    <span className="text-[11px] text-navy/45 ml-auto font-mono">
-                      {formatDistanceToNow(new Date(err.createdAt), { addSuffix: true })}
-                    </span>
+                    <TimeAgo
+                      date={err.createdAt}
+                      className="text-[11px] text-navy/45 ml-auto font-mono"
+                    />
                   </div>
                   <p className="mt-1 text-sm text-navy font-medium truncate" title={err.message}>
                     {err.message}

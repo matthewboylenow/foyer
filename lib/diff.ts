@@ -52,7 +52,11 @@ export function diffObjects(prev: Record<string, unknown>, next: Record<string, 
       const sub = diffObjects(a, b);
       if (Object.keys(sub).length > 0) out[k] = sub;
     } else {
-      out[k] = { from: a, to: b };
+      // Normalize undefined → null so JSONB round-tripping doesn't drop the
+      // key. Without this, a newly-added field produces `{ to: x }` (no
+      // `from`), which downstream code can't distinguish from a corrupted
+      // diff.
+      out[k] = { from: a === undefined ? null : a, to: b === undefined ? null : b };
     }
   }
   return out;
@@ -60,7 +64,9 @@ export function diffObjects(prev: Record<string, unknown>, next: Record<string, 
 
 /**
  * Type guard for narrowing audit metadata's `changes` field at the UI layer.
+ * Accepts partial diffs (only one of `from`/`to`) — legacy audit rows lost
+ * the `undefined` side during JSONB serialization before the write-side fix.
  */
 export function isFieldDiff(v: unknown): v is FieldDiff {
-  return isPlainObject(v) && 'from' in v && 'to' in v;
+  return isPlainObject(v) && ('from' in v || 'to' in v);
 }
