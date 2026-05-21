@@ -66,6 +66,7 @@ export function ParishIdentity({ content, logoUrl, bgImageUrl, bgVideoUrl }: Par
           muted
           loop
           playsInline
+          preload="auto"
           className="absolute inset-0 w-full h-full object-cover"
         />
       ) : bgImageUrl ? (

@@ -180,13 +180,13 @@ export function Player({ displayId }: PlayerProps) {
   useEffect(() => {
     if (pool.length === 0) return;
     const next = pool[(currentIndex + 1) % pool.length];
-    const urls = [
+    const imgUrls = [
       next?.resolvedMedia?.bgImageUrl,
       next?.resolvedMedia?.logoUrl,
       next?.resolvedMedia?.phoneMockupUrl,
     ].filter((u): u is string => Boolean(u));
 
-    for (const url of urls) {
+    for (const url of imgUrls) {
       const img = new window.Image();
       img.src = url;
       // Hint to the browser to decode off the main thread when supported.
@@ -196,6 +196,21 @@ export function Player({ displayId }: PlayerProps) {
         });
       }
     }
+
+    // Warm the HTTP cache for the next slide's background video so the
+    // <video> element doesn't sit on a black/gradient fallback for several
+    // seconds while it downloads 8+ MB. We use fetch() instead of a hidden
+    // <video preload=auto> because Tizen/OptiSigns is unreliable about
+    // honoring preload on detached video elements, but does cache plain
+    // GET responses. AbortController lets us cancel if the slide rotates
+    // before the fetch completes.
+    const videoUrl = next?.resolvedMedia?.bgVideoUrl;
+    if (!videoUrl) return;
+    const ctrl = new AbortController();
+    fetch(videoUrl, { signal: ctrl.signal, cache: 'force-cache' }).catch(() => {
+      /* network blip or aborted — playback fetch will retry */
+    });
+    return () => ctrl.abort();
   }, [currentIndex, pool]);
 
   // Watchdog: reload page if slide doesn't advance in 3× its expected duration
