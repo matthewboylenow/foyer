@@ -1,14 +1,11 @@
 import { Suspense } from 'react';
-import {
-  getDefaultTenant,
-  getSlidesByTenantWithMedia,
-  getCollectionsByTenant,
-} from '@/lib/db/queries';
+import { getCurrentTenant } from '@/lib/tenant';
+import { getSlidesByTenantWithMedia, getCollectionsByTenant } from '@/lib/db/queries';
 import { SlideGrid } from '@/components/admin/SlideGrid';
 import { SlideGridSkeleton } from '@/components/admin/SlideGridSkeleton';
 
 export default async function SlidesPage() {
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   const [slides, collections] = await Promise.all([
     tenant ? getSlidesByTenantWithMedia(tenant.id) : [],
     tenant ? getCollectionsByTenant(tenant.id) : [],

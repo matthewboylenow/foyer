@@ -1,8 +1,9 @@
-import { getDefaultTenant, getMediaByTenant } from '@/lib/db/queries';
+import { getCurrentTenant } from '@/lib/tenant';
+import { getMediaByTenant } from '@/lib/db/queries';
 import { MediaLibrary } from '@/components/admin/MediaLibrary';
 
 export default async function MediaPage() {
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   if (!tenant) {
     return (
       <div>

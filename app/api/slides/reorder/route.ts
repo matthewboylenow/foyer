@@ -3,8 +3,7 @@ import { slides } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { auth } from '@/lib/auth/config';
 import { logAudit } from '@/lib/auth/session';
-import { getDefaultTenant } from '@/lib/db/queries';
-
+import { getCurrentTenant } from '@/lib/tenant';
 /**
  * PATCH /api/slides/reorder
  *
@@ -20,7 +19,7 @@ export async function PATCH(req: Request) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   if (!tenant) return Response.json({ error: 'No tenant' }, { status: 400 });
 
   const { ids } = (await req.json()) as { ids?: string[] };

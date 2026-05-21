@@ -3,8 +3,7 @@ import { db } from '@/lib/db/client';
 import { collections } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
 import { logAudit } from '@/lib/auth/session';
-import { getDefaultTenant } from '@/lib/db/queries';
-
+import { getCurrentTenant } from '@/lib/tenant';
 const VALID_COLORS = ['rust', 'gold', 'navy', 'sage', 'plum', 'sky'] as const;
 
 interface PatchBody {
@@ -22,7 +21,7 @@ export async function PATCH(
   if (!session && process.env.AUTH_DEV_BYPASS !== '1') {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   if (!tenant) return Response.json({ error: 'No tenant' }, { status: 400 });
 
   const body = (await req.json()) as PatchBody;
@@ -66,7 +65,7 @@ export async function DELETE(
   if (!session && process.env.AUTH_DEV_BYPASS !== '1') {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   if (!tenant) return Response.json({ error: 'No tenant' }, { status: 400 });
 
   // Slides reference this via ON DELETE SET NULL — they survive, just lose

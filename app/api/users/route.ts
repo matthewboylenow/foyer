@@ -3,7 +3,7 @@ import { db } from '@/lib/db/client';
 import { tenantUsers } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
 import { logAudit } from '@/lib/auth/session';
-import { getDefaultTenant } from '@/lib/db/queries';
+import { getCurrentTenant } from '@/lib/tenant';
 import { getTenantUserRole } from '@/lib/auth/allowlist';
 
 /**
@@ -28,7 +28,7 @@ export async function GET() {
   if ('error' in guard) {
     return Response.json({ error: guard.error }, { status: guard.status });
   }
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   if (!tenant) return Response.json([]);
   const rows = await db.query.tenantUsers.findMany({
     where: eq(tenantUsers.tenantId, tenant.id),
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
   if ('error' in guard) {
     return Response.json({ error: guard.error }, { status: guard.status });
   }
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   if (!tenant) return Response.json({ error: 'No tenant' }, { status: 400 });
 
   const body = (await req.json()) as { email?: string; role?: string };

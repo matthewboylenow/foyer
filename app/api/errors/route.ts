@@ -1,7 +1,6 @@
 import { db } from '@/lib/db/client';
 import { errors } from '@/lib/db/schema';
-import { getDefaultTenant } from '@/lib/db/queries';
-
+import { getCurrentTenant } from '@/lib/tenant';
 /**
  * POST /api/errors
  *
@@ -41,7 +40,7 @@ export async function POST(req: Request) {
     const slideId = typeof body?.slideId === 'string' ? body.slideId : null;
     const context = body?.context && typeof body.context === 'object' ? body.context : {};
 
-    const tenant = await getDefaultTenant();
+    const tenant = await getCurrentTenant();
 
     await db.insert(errors).values({
       tenantId: tenant?.id ?? null,

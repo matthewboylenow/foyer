@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Upload, X, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { useTenantSlug } from '@/lib/tenant-client';
 import { UploadProgress } from './UploadProgress';
 
 interface VideoUploadProps {
@@ -25,6 +26,7 @@ export function VideoUpload({
 }: VideoUploadProps) {
   const [progress, setProgress] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const tenantSlug = useTenantSlug();
 
   async function handleFile(file: File) {
     if (file.size > maxSizeMB * 1024 * 1024) {
@@ -34,7 +36,8 @@ export function VideoUpload({
 
     setProgress(0);
     try {
-      const result = await upload(file.name, file, {
+      const pathname = tenantSlug ? `${tenantSlug}/${file.name}` : file.name;
+      const result = await upload(pathname, file, {
         access: 'public',
         handleUploadUrl: '/api/upload/client',
         clientPayload: JSON.stringify({ type: 'video' }),

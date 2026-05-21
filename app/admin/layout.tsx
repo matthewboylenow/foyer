@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth/config';
 import { isSuperAdmin } from '@/lib/auth/super';
+import { getCurrentTenant } from '@/lib/tenant';
+import { TenantSlugProvider } from '@/lib/tenant-client';
 import { AdminNav } from '@/components/admin/AdminNav';
 import { AdminPageTransition } from '@/components/admin/AdminPageTransition';
 import { TenantTheme } from '@/components/TenantTheme';
@@ -20,16 +22,23 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const devBypass = process.env.AUTH_DEV_BYPASS === '1';
   const userIsSuper = devBypass || isSuperAdmin(session?.user?.email);
 
+  // Provide the current tenant slug to client components — uploads use it
+  // to prefix Vercel Blob paths so each tenant's media lives in its own
+  // folder rather than co-mingled at the bucket root.
+  const tenant = await getCurrentTenant();
+
   return (
-    <TenantTheme>
-      <div className="min-h-screen bg-cream">
-        <AdminNav user={session?.user ?? null} isSuperAdmin={userIsSuper} />
-        <main className="lg:ml-56 px-4 sm:px-8 py-8 min-h-screen">
-          <div className="max-w-7xl mx-auto">
-            <AdminPageTransition>{children}</AdminPageTransition>
-          </div>
-        </main>
-      </div>
-    </TenantTheme>
+    <TenantSlugProvider slug={tenant?.slug ?? null}>
+      <TenantTheme>
+        <div className="min-h-screen bg-cream">
+          <AdminNav user={session?.user ?? null} isSuperAdmin={userIsSuper} />
+          <main className="lg:ml-56 px-4 sm:px-8 py-8 min-h-screen">
+            <div className="max-w-7xl mx-auto">
+              <AdminPageTransition>{children}</AdminPageTransition>
+            </div>
+          </main>
+        </div>
+      </TenantTheme>
+    </TenantSlugProvider>
   );
 }

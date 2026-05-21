@@ -3,10 +3,9 @@ import { db } from '@/lib/db/client';
 import { slides } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
 import { logAudit } from '@/lib/auth/session';
-import { getDefaultTenant } from '@/lib/db/queries';
-
+import { getCurrentTenant } from '@/lib/tenant';
 export async function GET() {
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   if (!tenant) return Response.json([]);
   const all = await db.query.slides.findMany({ where: eq(slides.tenantId, tenant.id) });
   return Response.json(all);
@@ -18,7 +17,7 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   if (!tenant) return Response.json({ error: 'No tenant' }, { status: 400 });
 
   const body = await req.json();

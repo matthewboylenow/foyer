@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
-import { getDefaultTenant, getSettingsByTenant } from '@/lib/db/queries';
+import { getCurrentTenant } from '@/lib/tenant';
+import { getSettingsByTenant } from '@/lib/db/queries';
 
 /**
  * Saint Helen brand defaults — used when a tenant hasn't set a custom
@@ -47,7 +48,7 @@ function mix(hex: string, target: string, t: number): string {
  * base color toward white/black so tenants don't have to set every swatch.
  */
 export async function TenantTheme({ children }: { children: React.ReactNode }) {
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   const settings = tenant ? await getSettingsByTenant(tenant.id) : null;
 
   const navy = settings?.primaryColor || DEFAULTS.navy;

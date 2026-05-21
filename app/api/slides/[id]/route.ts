@@ -3,7 +3,7 @@ import { db } from '@/lib/db/client';
 import { slides } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
 import { logAudit } from '@/lib/auth/session';
-import { getDefaultTenant } from '@/lib/db/queries';
+import { getCurrentTenant } from '@/lib/tenant';
 import { diffObjects } from '@/lib/diff';
 
 export async function GET(
@@ -27,7 +27,7 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json();
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
 
   // Snapshot the existing slide so we can diff its fields vs the update.
   const existing = await db.query.slides.findFirst({ where: eq(slides.id, id) });
@@ -102,7 +102,7 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
 
   // Snapshot before delete so the audit row carries enough state to recover.
   const existing = await db.query.slides.findFirst({ where: eq(slides.id, id) });

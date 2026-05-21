@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth/config';
-import { getDefaultTenant, getSettingsWithMedia } from '@/lib/db/queries';
+import { getCurrentTenant } from '@/lib/tenant';
+import { getSettingsWithMedia } from '@/lib/db/queries';
 import { SettingsForm } from '@/components/admin/SettingsForm';
 import { LogoSection } from '@/components/admin/LogoSection';
 import { PaletteEditor } from '@/components/admin/PaletteEditor';
@@ -9,7 +10,7 @@ import { signOut } from '@/lib/auth/config';
 
 export default async function SettingsPage() {
   const session = await auth();
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   const settings = tenant ? await getSettingsWithMedia(tenant.id) : null;
   const envFromFallback =
     process.env.EMAIL_FROM?.trim().replace(/^["']|["']$/g, '') ??

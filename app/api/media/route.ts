@@ -1,7 +1,8 @@
 import { auth } from '@/lib/auth/config';
 import { db } from '@/lib/db/client';
 import { media } from '@/lib/db/schema';
-import { getDefaultTenant, getMediaByTenant } from '@/lib/db/queries';
+import { getCurrentTenant } from '@/lib/tenant';
+import { getMediaByTenant } from '@/lib/db/queries';
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -9,7 +10,7 @@ export async function GET(req: Request) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   if (!tenant) return Response.json([]);
 
   const url = new URL(req.url);
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   if (!tenant) return Response.json({ error: 'No tenant' }, { status: 400 });
 
   const body = (await req.json()) as {

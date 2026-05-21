@@ -1,8 +1,9 @@
-import { getDefaultTenant, getRecentAuditLog, getSlideTitles } from '@/lib/db/queries';
+import { getCurrentTenant } from '@/lib/tenant';
+import { getRecentAuditLog, getSlideTitles } from '@/lib/db/queries';
 import { AuditList } from '@/components/admin/AuditList';
 
 export default async function AuditPage() {
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   if (!tenant) {
     return (
       <div>

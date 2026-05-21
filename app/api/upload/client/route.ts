@@ -1,5 +1,6 @@
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { auth } from '@/lib/auth/config';
+import { getCurrentTenant } from '@/lib/tenant';
 
 const ALLOWED_IMAGE = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
 const ALLOWED_VIDEO = ['video/mp4', 'video/webm', 'video/quicktime'];
@@ -23,15 +24,29 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const tenant = await getCurrentTenant();
+  if (!tenant) return Response.json({ error: 'No tenant' }, { status: 400 });
+
   const body = (await req.json()) as HandleUploadBody;
 
   try {
     const result = await handleUpload({
       body,
       request: req,
-      onBeforeGenerateToken: async (_pathname, clientPayload) => {
+      onBeforeGenerateToken: async (pathname, clientPayload) => {
         const payload = clientPayload ? (JSON.parse(clientPayload) as { type?: string }) : {};
         const isVideo = payload.type === 'video';
+
+        // Refuse to mint a token for a path that isn't inside the
+        // requesting tenant's folder. The client should be sending
+        // "<slug>/<filename>" — if it isn't, either the slug provider
+        // didn't hydrate or someone is trying to cross-tenant write.
+        if (!pathname.startsWith(`${tenant.slug}/`)) {
+          throw new Error(
+            `Upload path must live under "${tenant.slug}/" (got "${pathname}")`,
+          );
+        }
+
         return {
           allowedContentTypes: isVideo ? ALLOWED_VIDEO : ALLOWED_IMAGE,
           maximumSizeInBytes: isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES,

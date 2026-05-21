@@ -1,13 +1,10 @@
-import {
-  getDefaultTenant,
-  getSlidesByTenant,
-  getCollectionsByTenant,
-} from '@/lib/db/queries';
+import { getCurrentTenant } from '@/lib/tenant';
+import { getSlidesByTenant, getCollectionsByTenant } from '@/lib/db/queries';
 import { ScheduleTimeline } from '@/components/admin/ScheduleTimeline';
 import type { Slide } from '@/lib/db/schema';
 
 export default async function SchedulePage() {
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   const [slides, collections] = await Promise.all([
     tenant ? getSlidesByTenant(tenant.id) : [],
     tenant ? getCollectionsByTenant(tenant.id) : [],

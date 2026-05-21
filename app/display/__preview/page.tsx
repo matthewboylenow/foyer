@@ -1,10 +1,6 @@
 import { notFound } from 'next/navigation';
-import {
-  getSlideById,
-  getDefaultTenant,
-  getSettingsWithMedia,
-  getMediaById,
-} from '@/lib/db/queries';
+import { getCurrentTenant } from '@/lib/tenant';
+import { getSlideById, getSettingsWithMedia, getMediaById } from '@/lib/db/queries';
 import { templates } from '@/components/templates';
 import type { SlideWithContent } from '@/lib/db/schema';
 
@@ -26,7 +22,7 @@ export default async function PreviewPage({
   if (!templateConfig) notFound();
 
   // Resolve media URLs so the preview matches what the player will show.
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   const settings = tenant ? await getSettingsWithMedia(tenant.id) : null;
   const tenantLogoUrl = settings?.logoMedia?.blobUrl ?? null;
 

@@ -2,8 +2,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { displays, slides, media, settings, type SlideWithContent } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
-import { getDefaultTenant } from '@/lib/db/queries';
-
+import { getCurrentTenant } from '@/lib/tenant';
 /**
  * GET /api/displays/status
  *
@@ -22,7 +21,7 @@ export async function GET() {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   if (!tenant) return Response.json([]);
 
   const rows = await db.query.displays.findMany({

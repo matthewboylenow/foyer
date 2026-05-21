@@ -1,15 +1,14 @@
 import { db } from '@/lib/db/client';
 import { displays } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
-import { getDefaultTenant } from '@/lib/db/queries';
-
+import { getCurrentTenant } from '@/lib/tenant';
 export async function POST(req: Request) {
   const session = await auth();
   if (!session && process.env.AUTH_DEV_BYPASS !== '1') {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   if (!tenant) return Response.json({ error: 'No tenant' }, { status: 400 });
 
   const { name, location } = await req.json();

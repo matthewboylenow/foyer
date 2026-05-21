@@ -1,12 +1,6 @@
 import { notFound } from 'next/navigation';
-import {
-  getSlideById,
-  getDefaultTenant,
-  getSettingsWithMedia,
-  getMediaById,
-  getDisplaysByTenant,
-  getCollectionsByTenant,
-} from '@/lib/db/queries';
+import { getCurrentTenant } from '@/lib/tenant';
+import { getSlideById, getSettingsWithMedia, getMediaById, getDisplaysByTenant, getCollectionsByTenant } from '@/lib/db/queries';
 import { SlideEditor } from '@/components/admin/SlideEditor';
 import type { TemplateKey } from '@/components/templates';
 import type { SlideWithContent } from '@/lib/db/schema';
@@ -20,7 +14,7 @@ export default async function EditSlidePage({
   const slide = await getSlideById(id);
   if (!slide) notFound();
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   const settings = tenant ? await getSettingsWithMedia(tenant.id) : null;
   const tenantLogoUrl = settings?.logoMedia?.blobUrl ?? null;
   const displays = tenant ? await getDisplaysByTenant(tenant.id) : [];

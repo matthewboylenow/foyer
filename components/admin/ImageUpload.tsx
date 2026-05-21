@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Upload, X, ImageIcon, Library } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { useTenantSlug } from '@/lib/tenant-client';
 import { MediaLibraryPicker } from './MediaLibraryPicker';
 import { UploadProgress } from './UploadProgress';
 
@@ -31,6 +32,7 @@ export function ImageUpload({
   const [progress, setProgress] = useState<number | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const tenantSlug = useTenantSlug();
 
   async function handleFile(file: File) {
     if (file.size > maxSizeMB * 1024 * 1024) {
@@ -42,8 +44,10 @@ export function ImageUpload({
     try {
       // 1. Upload directly to Vercel Blob (browser → blob storage, never
       //    through our serverless function — so the 4.5 MB body limit
-      //    doesn't apply).
-      const result = await upload(file.name, file, {
+      //    doesn't apply). Path is prefixed with the tenant slug so each
+      //    parish's media lives in its own folder.
+      const pathname = tenantSlug ? `${tenantSlug}/${file.name}` : file.name;
+      const result = await upload(pathname, file, {
         access: 'public',
         handleUploadUrl: '/api/upload/client',
         clientPayload: JSON.stringify({ type }),

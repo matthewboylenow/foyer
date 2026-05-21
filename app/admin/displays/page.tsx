@@ -1,8 +1,9 @@
-import { getDefaultTenant, getDisplaysByTenant } from '@/lib/db/queries';
+import { getCurrentTenant } from '@/lib/tenant';
+import { getDisplaysByTenant } from '@/lib/db/queries';
 import { DisplayManager } from '@/components/admin/DisplayManager';
 
 export default async function DisplaysPage() {
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   const displays = tenant ? await getDisplaysByTenant(tenant.id) : [];
 
   return (

@@ -4,12 +4,8 @@ import { db } from '@/lib/db/client';
 import { media } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
 import { logAudit } from '@/lib/auth/session';
-import {
-  getDefaultTenant,
-  getMediaById,
-  getSlidesReferencingMedia,
-  isMediaUsedBySettings,
-} from '@/lib/db/queries';
+import { getCurrentTenant } from '@/lib/tenant';
+import { getMediaById, getSlidesReferencingMedia, isMediaUsedBySettings } from '@/lib/db/queries';
 
 export async function DELETE(
   _req: Request,
@@ -20,7 +16,7 @@ export async function DELETE(
   if (!session && process.env.AUTH_DEV_BYPASS !== '1') {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   if (!tenant) return Response.json({ error: 'No tenant' }, { status: 400 });
 
   const m = await getMediaById(id);

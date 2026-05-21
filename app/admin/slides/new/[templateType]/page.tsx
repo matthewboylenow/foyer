@@ -1,12 +1,8 @@
 import { notFound } from 'next/navigation';
 import { templates } from '@/components/templates';
 import { SlideEditor } from '@/components/admin/SlideEditor';
-import {
-  getDefaultTenant,
-  getSettingsWithMedia,
-  getDisplaysByTenant,
-  getCollectionsByTenant,
-} from '@/lib/db/queries';
+import { getCurrentTenant } from '@/lib/tenant';
+import { getSettingsWithMedia, getDisplaysByTenant, getCollectionsByTenant } from '@/lib/db/queries';
 import type { TemplateKey } from '@/components/templates';
 
 export default async function NewSlideByTemplatePage({
@@ -17,7 +13,7 @@ export default async function NewSlideByTemplatePage({
   const { templateType } = await params;
   if (!(templateType in templates)) notFound();
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   const settings = tenant ? await getSettingsWithMedia(tenant.id) : null;
   const tenantLogoUrl = settings?.logoMedia?.blobUrl ?? null;
   const displays = tenant ? await getDisplaysByTenant(tenant.id) : [];

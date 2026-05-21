@@ -1,8 +1,7 @@
 import { eq, and } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { tenantUsers, settings } from '@/lib/db/schema';
-import { getDefaultTenant } from '@/lib/db/queries';
-
+import { getCurrentTenant } from '@/lib/tenant';
 /**
  * Tenant-aware allowlist.
  *
@@ -20,7 +19,7 @@ export async function isAllowedEmail(email: string): Promise<boolean> {
   const domain = e.split('@')[1];
   if (!domain) return false;
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   if (!tenant) return false;
 
   // Domain match — wildcard for everyone at a staff domain.
@@ -44,7 +43,7 @@ export async function isAllowedEmail(email: string): Promise<boolean> {
 export async function getTenantUserRole(
   email: string,
 ): Promise<'owner' | 'editor' | null> {
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   if (!tenant) return null;
   const e = email.toLowerCase().trim();
   const member = await db.query.tenantUsers.findFirst({

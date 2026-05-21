@@ -2,7 +2,8 @@ import bcrypt from 'bcryptjs';
 import { eq, and, isNull, gte, desc } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { otpCodes } from '@/lib/db/schema';
-import { getDefaultTenant, getSettingsByTenant } from '@/lib/db/queries';
+import { getCurrentTenant } from '@/lib/tenant';
+import { getSettingsByTenant } from '@/lib/db/queries';
 
 function getResend() {
   const { Resend } = require('resend') as typeof import('resend');
@@ -28,7 +29,7 @@ export async function sendOtp(email: string): Promise<void> {
   // Resolve the "from" address. Per-tenant override wins (configured in
   // /admin/settings); falls back to EMAIL_FROM env var; final fallback is
   // the original Saint Helen address so existing dev/prod keeps working.
-  const tenant = await getDefaultTenant();
+  const tenant = await getCurrentTenant();
   const tenantSettings = tenant ? await getSettingsByTenant(tenant.id) : null;
   const tenantFromName = tenantSettings?.emailFromName?.trim();
   const tenantFromAddr = tenantSettings?.emailFromAddress?.trim();
