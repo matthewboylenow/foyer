@@ -2,9 +2,10 @@
 
 import { useState, useRef } from 'react';
 import { toast } from 'sonner';
-import { Upload, X, ImageIcon } from 'lucide-react';
+import { Upload, X, ImageIcon, Library } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { MediaLibraryPicker } from './MediaLibraryPicker';
 
 interface ImageUploadProps {
   label?: string;
@@ -26,6 +27,7 @@ export function ImageUpload({
   maxSizeMB = 5,
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleFile(file: File) {
@@ -81,6 +83,16 @@ export function ImageUpload({
               <Upload size={14} className="mr-2" />
               Replace
             </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setLibraryOpen(true)}
+              disabled={uploading}
+            >
+              <Library size={14} className="mr-2" />
+              From library
+            </Button>
             {onCleared && (
               <Button
                 type="button"
@@ -97,16 +109,27 @@ export function ImageUpload({
           </div>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className="w-full border-2 border-dashed border-border rounded-md p-6 flex flex-col items-center gap-2 text-muted-foreground hover:border-navy hover:text-navy transition-colors"
-        >
-          <ImageIcon size={24} />
-          <span className="text-sm">{uploading ? 'Uploading…' : 'Click to upload'}</span>
-          <span className="text-xs">PNG, JPG, WebP, or SVG · max {maxSizeMB} MB</span>
-        </button>
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            className="w-full border-2 border-dashed border-border rounded-md p-6 flex flex-col items-center gap-2 text-muted-foreground hover:border-navy hover:text-navy transition-colors"
+          >
+            <ImageIcon size={24} />
+            <span className="text-sm">{uploading ? 'Uploading…' : 'Click to upload'}</span>
+            <span className="text-xs">PNG, JPG, WebP, or SVG · max {maxSizeMB} MB</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setLibraryOpen(true)}
+            disabled={uploading}
+            className="w-full text-xs text-muted-foreground hover:text-navy transition-colors py-1 flex items-center justify-center gap-1.5"
+          >
+            <Library size={12} />
+            or choose from library
+          </button>
+        </div>
       )}
 
       <input
@@ -118,6 +141,13 @@ export function ImageUpload({
           const file = e.target.files?.[0];
           if (file) handleFile(file);
         }}
+      />
+
+      <MediaLibraryPicker
+        open={libraryOpen}
+        onOpenChange={setLibraryOpen}
+        filter="image-or-logo"
+        onSelect={({ id, blobUrl }) => onUploaded({ id, blobUrl })}
       />
     </div>
   );

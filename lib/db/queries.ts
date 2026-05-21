@@ -1,6 +1,6 @@
 import { eq, and, or, isNull, lte, gte, asc, desc } from 'drizzle-orm';
 import { db } from './client';
-import { slides, displays, settings, tenants, auditLog, errors, collections } from './schema';
+import { slides, displays, settings, tenants, auditLog, errors, collections, media } from './schema';
 import type { SlideWithContent } from './schema';
 
 export type EligibleSlide = SlideWithContent & {
@@ -174,10 +174,63 @@ export async function getSettingsByTenant(tenantId: string) {
 }
 
 export async function getMediaById(id: string) {
-  const { media } = await import('./schema');
   return db.query.media.findFirst({
     where: eq(media.id, id),
   });
+}
+
+/**
+ * List all media uploaded by a tenant, newest first. The library picker
+ * groups image + logo together (both are picker-eligible for any
+ * ImageUpload slot), so pass type='image-or-logo' to get both.
+ */
+export async function getMediaByTenant(
+  tenantId: string,
+  type?: 'image' | 'logo' | 'video' | 'image-or-logo',
+) {
+  return db.query.media.findMany({
+    where: and(
+      eq(media.tenantId, tenantId),
+      type === 'image-or-logo'
+        ? or(eq(media.type, 'image'), eq(media.type, 'logo'))
+        : type
+        ? eq(media.type, type)
+        : undefined,
+    ),
+    orderBy: [desc(media.uploadedAt)],
+  });
+}
+
+/**
+ * Find every slide that references a media id in any of its content slots
+ * (logoMediaId, bgImageMediaId, bgVideoMediaId, phoneMockupMediaId). Used
+ * to block deletes that would orphan a slide, and to show the user which
+ * slides need editing first.
+ */
+export async function getSlidesReferencingMedia(tenantId: string, mediaId: string) {
+  const rows = await db.query.slides.findMany({
+    where: eq(slides.tenantId, tenantId),
+    columns: { id: true, title: true, content: true, templateType: true },
+  });
+  return rows.filter((s) => {
+    const c = s.content as Record<string, unknown> | null;
+    if (!c) return false;
+    return (
+      c.logoMediaId === mediaId ||
+      c.bgImageMediaId === mediaId ||
+      c.bgVideoMediaId === mediaId ||
+      c.phoneMockupMediaId === mediaId
+    );
+  });
+}
+
+/**
+ * Is this media row the tenant's default logo? (Different table from
+ * slides — settings.logoMediaId is the parish-wide default.)
+ */
+export async function isMediaUsedBySettings(tenantId: string, mediaId: string) {
+  const s = await getSettingsByTenant(tenantId);
+  return s?.logoMediaId === mediaId;
 }
 
 export async function getSettingsWithMedia(tenantId: string) {

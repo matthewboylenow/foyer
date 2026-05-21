@@ -19,7 +19,7 @@ export async function POST(req: Request) {
 
   if (!file) return Response.json({ error: 'No file' }, { status: 400 });
 
-  const blob = await put(file.name, file, { access: 'public' });
+  const blob = await put(file.name, file, { access: 'public', addRandomSuffix: true });
 
   const [row] = await db
     .insert(media)

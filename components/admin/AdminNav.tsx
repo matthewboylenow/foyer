@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Users as UsersIcon,
   Settings as SettingsIcon,
+  Images,
   Menu,
   X,
   LogOut,
@@ -28,6 +29,7 @@ interface NavLink {
     | '/admin/slides'
     | '/admin/schedule'
     | '/admin/displays'
+    | '/admin/media'
     | '/admin/audit'
     | '/admin/errors'
     | '/admin/users'
@@ -40,6 +42,7 @@ const NAV_LINKS: NavLink[] = [
   { href: '/admin/slides', label: 'Slides', icon: LayoutGrid },
   { href: '/admin/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/admin/displays', label: 'Displays', icon: Monitor },
+  { href: '/admin/media', label: 'Library', icon: Images },
   { href: '/admin/audit', label: 'Activity', icon: Activity },
   { href: '/admin/errors', label: 'Errors', icon: AlertTriangle },
   { href: '/admin/users', label: 'Users', icon: UsersIcon },
