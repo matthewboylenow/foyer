@@ -9,7 +9,7 @@ import {
   CalendarDays,
   Monitor,
   Activity,
-  AlertTriangle,
+  Shield,
   Users as UsersIcon,
   Settings as SettingsIcon,
   Images,
@@ -31,7 +31,6 @@ interface NavLink {
     | '/admin/displays'
     | '/admin/media'
     | '/admin/audit'
-    | '/admin/errors'
     | '/admin/users'
     | '/admin/settings';
   label: string;
@@ -44,16 +43,16 @@ const NAV_LINKS: NavLink[] = [
   { href: '/admin/displays', label: 'Displays', icon: Monitor },
   { href: '/admin/media', label: 'Library', icon: Images },
   { href: '/admin/audit', label: 'Activity', icon: Activity },
-  { href: '/admin/errors', label: 'Errors', icon: AlertTriangle },
   { href: '/admin/users', label: 'Users', icon: UsersIcon },
   { href: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
 interface AdminNavProps {
   user: { name?: string | null; email?: string | null; image?: string | null } | null;
+  isSuperAdmin?: boolean;
 }
 
-export function AdminNav({ user }: AdminNavProps) {
+export function AdminNav({ user, isSuperAdmin = false }: AdminNavProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -112,6 +111,19 @@ export function AdminNav({ user }: AdminNavProps) {
               </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" side="top">
+              {isSuperAdmin && (
+                <DropdownMenuItem
+                  render={
+                    <Link
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      href={'/super' as any}
+                    />
+                  }
+                >
+                  <Shield className="w-4 h-4 mr-2" />
+                  Super admin
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/login' })}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign out
@@ -159,6 +171,17 @@ export function AdminNav({ user }: AdminNavProps) {
                 </Link>
               );
             })}
+            {isSuperAdmin && (
+              <Link
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                href={'/super' as any}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-cream/75 hover:bg-cream/5"
+                onClick={() => setMobileOpen(false)}
+              >
+                <Shield size={16} className="text-gold" />
+                Super admin
+              </Link>
+            )}
             <button
               className="flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg text-sm text-rust"
               onClick={() => signOut({ callbackUrl: '/login' })}
