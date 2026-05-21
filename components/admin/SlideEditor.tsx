@@ -299,34 +299,43 @@ export function SlideEditor({
             <div className="p-4 border border-border rounded-lg">
               <div className="flex items-center gap-3">
                 <Switch checked={active} onCheckedChange={setActive} />
-                <Label>Active when saved</Label>
+                <Label>Show on TVs as soon as I save</Label>
               </div>
             </div>
           )}
 
           {/* Schedule type */}
           <div className="p-4 border border-border rounded-lg space-y-4">
-            <h3 className="font-medium text-sm">Schedule</h3>
-            <div className="flex gap-4">
-              {(['evergreen', 'dated'] as const).map((t) => (
-                <label key={t} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="scheduleType"
-                    value={t}
-                    checked={scheduleType === t}
-                    onChange={() => setScheduleType(t)}
-                    className="accent-rust"
-                  />
-                  <span className="text-sm capitalize">{t}</span>
-                </label>
-              ))}
+            <h3 className="font-medium text-sm">When to show this</h3>
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="scheduleType"
+                  value="evergreen"
+                  checked={scheduleType === 'evergreen'}
+                  onChange={() => setScheduleType('evergreen')}
+                  className="accent-rust"
+                />
+                <span className="text-sm">Always (until I turn it off)</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="scheduleType"
+                  value="dated"
+                  checked={scheduleType === 'dated'}
+                  onChange={() => setScheduleType('dated')}
+                  className="accent-rust"
+                />
+                <span className="text-sm">Only between certain dates</span>
+              </label>
             </div>
 
             {scheduleType === 'dated' && (
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  Leave Start blank for &ldquo;starts now&rdquo;. Leave End blank to run forever once started.
+                  Leave Start blank to start right now. Leave End blank to keep running until you turn it off.
                 </p>
                 <div className="space-y-1">
                   <Label className="text-xs">Start date</Label>
@@ -352,10 +361,10 @@ export function SlideEditor({
 
           {/* Weight + duration */}
           <div className="p-4 border border-border rounded-lg space-y-4">
-            <h3 className="font-medium text-sm">Rotation</h3>
+            <h3 className="font-medium text-sm">How often & how long</h3>
             <div className="space-y-1">
               <Label className="text-xs">
-                Weight (default {templateConfig.defaultWeight})
+                How often to show (1 = normal, 2 = twice as often, 0 = off)
               </Label>
               <div className="flex items-center gap-3">
                 <input
@@ -372,7 +381,7 @@ export function SlideEditor({
             </div>
             <div className="space-y-1">
               <Label className="text-xs">
-                Duration override (sec) — empty inherits {templateConfig.defaultDurationSec}s
+                Time on screen (seconds) — leave blank to use the default of {templateConfig.defaultDurationSec}s
               </Label>
               <Input
                 type="number"
@@ -399,9 +408,9 @@ export function SlideEditor({
           {/* Per-display targeting */}
           {displays.length > 0 && (
             <div className="p-4 border border-border rounded-lg space-y-3">
-              <h3 className="font-medium text-sm">Displays</h3>
+              <h3 className="font-medium text-sm">Which TVs</h3>
               <p className="text-xs text-muted-foreground">
-                Leave all unchecked to show on every display.
+                Leave everything unchecked to show on every TV.
               </p>
               <div className="space-y-2">
                 {displays.map((d) => {
@@ -429,7 +438,7 @@ export function SlideEditor({
                   onClick={() => setTargetDisplays([])}
                   className="text-xs text-rust underline"
                 >
-                  Clear (show on all displays)
+                  Show on every TV instead
                 </button>
               )}
             </div>
@@ -489,7 +498,7 @@ function TemplateFields({
             onChange={(v: SizePreset) => set('headlineSize', v)}
           />
           <div className="space-y-1">
-            <Label>Subline (optional)</Label>
+            <Label>Tagline (optional)</Label>
             <RichTextEditor
               value={c.subline ?? ''}
               onChange={(html) => set('subline', html)}
@@ -502,10 +511,10 @@ function TemplateFields({
             </p>
           </div>
           <p className="text-xs text-muted-foreground">
-            Logo uses the tenant default from Settings unless overridden here.
+            Uses the parish logo from Settings unless you set one here.
           </p>
           <ImageUpload
-            label="Slide-specific logo (optional)"
+            label="Use a different logo on this slide (optional)"
             type="logo"
             currentUrl={slideLogoUrl}
             onUploaded={({ id, blobUrl }) => {
@@ -544,7 +553,7 @@ function TemplateFields({
               }}
             />
             <VideoUpload
-              label="Background video (loops, muted)"
+              label="Background video (plays silently on a loop)"
               currentUrl={bgVideoUrl}
               onUploaded={({ id, blobUrl }) => {
                 set('bgVideoMediaId', id);
@@ -609,7 +618,7 @@ function TemplateFields({
             onChange={(v: SizePreset) => set('headlineSize', v)}
           />
           <div className="space-y-1">
-            <Label>Meta line (date, time, location — appears between headline and body)</Label>
+            <Label>Date, time &amp; location (shown between the headline and body)</Label>
             <Input value={c.meta ?? ''} onChange={(e) => set('meta', e.target.value)} placeholder="Sunday, October 12 at 7 PM in Meaney Hall" />
           </div>
           <div className="space-y-1">

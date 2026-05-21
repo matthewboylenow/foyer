@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { upload } from '@vercel/blob/client';
 import { toast } from 'sonner';
 import { Upload, X, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { UploadProgress } from './UploadProgress';
 
 interface VideoUploadProps {
   label?: string;
@@ -19,9 +21,9 @@ export function VideoUpload({
   currentUrl,
   onUploaded,
   onCleared,
-  maxSizeMB = 25,
+  maxSizeMB = 100,
 }: VideoUploadProps) {
-  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleFile(file: File) {
@@ -30,30 +32,46 @@ export function VideoUpload({
       return;
     }
 
-    setUploading(true);
+    setProgress(0);
     try {
-      const form = new FormData();
-      form.append('file', file);
-      form.append('type', 'video');
+      const result = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/upload/client',
+        clientPayload: JSON.stringify({ type: 'video' }),
+        onUploadProgress: ({ percentage }) => setProgress(percentage),
+      });
 
-      const res = await fetch('/api/upload', { method: 'POST', body: form });
+      const res = await fetch('/api/media', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          blobUrl: result.url,
+          filename: file.name,
+          bytes: file.size,
+          type: 'video',
+        }),
+      });
       if (!res.ok) throw new Error(await res.text());
-      const media = await res.json();
-      onUploaded({ id: media.id, blobUrl: media.blobUrl });
+      const row = (await res.json()) as { id: string; blobUrl: string };
+      onUploaded({ id: row.id, blobUrl: row.blobUrl });
       toast.success('Video uploaded');
     } catch (err) {
       toast.error(`Upload failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     } finally {
-      setUploading(false);
+      setProgress(null);
       if (inputRef.current) inputRef.current.value = '';
     }
   }
+
+  const uploading = progress !== null;
 
   return (
     <div className="space-y-2">
       {label && <Label>{label}</Label>}
 
-      {currentUrl ? (
+      {uploading ? (
+        <UploadProgress percent={progress ?? 0} label="Uploading video…" />
+      ) : currentUrl ? (
         <div className="flex items-start gap-3">
           <video
             src={currentUrl}
@@ -70,7 +88,6 @@ export function VideoUpload({
               variant="outline"
               size="sm"
               onClick={() => inputRef.current?.click()}
-              disabled={uploading}
             >
               <Upload size={14} className="mr-2" />
               Replace
@@ -81,7 +98,6 @@ export function VideoUpload({
                 variant="ghost"
                 size="sm"
                 onClick={onCleared}
-                disabled={uploading}
                 className="text-rust"
               >
                 <X size={14} className="mr-2" />
@@ -94,11 +110,10 @@ export function VideoUpload({
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          disabled={uploading}
           className="w-full border-2 border-dashed border-border rounded-md p-6 flex flex-col items-center gap-2 text-muted-foreground hover:border-navy hover:text-navy transition-colors"
         >
           <Film size={24} />
-          <span className="text-sm">{uploading ? 'Uploading…' : 'Click to upload'}</span>
+          <span className="text-sm">Click to upload</span>
           <span className="text-xs text-center">
             MP4 / WebM · 5–15s loop recommended · max {maxSizeMB} MB
           </span>

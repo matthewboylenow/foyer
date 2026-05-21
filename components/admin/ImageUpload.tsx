@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { upload } from '@vercel/blob/client';
 import { toast } from 'sonner';
 import { Upload, X, ImageIcon, Library } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { MediaLibraryPicker } from './MediaLibraryPicker';
+import { UploadProgress } from './UploadProgress';
 
 interface ImageUploadProps {
   label?: string;
@@ -24,9 +26,9 @@ export function ImageUpload({
   onUploaded,
   onCleared,
   accept = 'image/png,image/jpeg,image/webp,image/svg+xml',
-  maxSizeMB = 5,
+  maxSizeMB = 10,
 }: ImageUploadProps) {
-  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -36,33 +38,50 @@ export function ImageUpload({
       return;
     }
 
-    setUploading(true);
+    setProgress(0);
     try {
-      const form = new FormData();
-      form.append('file', file);
-      form.append('type', type);
+      // 1. Upload directly to Vercel Blob (browser → blob storage, never
+      //    through our serverless function — so the 4.5 MB body limit
+      //    doesn't apply).
+      const result = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/upload/client',
+        clientPayload: JSON.stringify({ type }),
+        onUploadProgress: ({ percentage }) => setProgress(percentage),
+      });
 
-      const res = await fetch('/api/upload', { method: 'POST', body: form });
-      if (!res.ok) {
-        const err = await res.text();
-        throw new Error(err);
-      }
-      const media = await res.json();
-      onUploaded({ id: media.id, blobUrl: media.blobUrl });
+      // 2. Register the row in our DB and get the media id.
+      const res = await fetch('/api/media', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          blobUrl: result.url,
+          filename: file.name,
+          bytes: file.size,
+          type,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const row = (await res.json()) as { id: string; blobUrl: string };
+      onUploaded({ id: row.id, blobUrl: row.blobUrl });
       toast.success('Image uploaded');
     } catch (err) {
       toast.error(`Upload failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     } finally {
-      setUploading(false);
+      setProgress(null);
       if (inputRef.current) inputRef.current.value = '';
     }
   }
+
+  const uploading = progress !== null;
 
   return (
     <div className="space-y-2">
       {label && <Label>{label}</Label>}
 
-      {currentUrl ? (
+      {uploading ? (
+        <UploadProgress percent={progress ?? 0} />
+      ) : currentUrl ? (
         <div className="flex items-start gap-3">
           <div className="border border-border rounded-md p-2 bg-muted/30 flex items-center justify-center" style={{ width: 120, height: 120 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -78,7 +97,6 @@ export function ImageUpload({
               variant="outline"
               size="sm"
               onClick={() => inputRef.current?.click()}
-              disabled={uploading}
             >
               <Upload size={14} className="mr-2" />
               Replace
@@ -88,7 +106,6 @@ export function ImageUpload({
               variant="ghost"
               size="sm"
               onClick={() => setLibraryOpen(true)}
-              disabled={uploading}
             >
               <Library size={14} className="mr-2" />
               From library
@@ -99,7 +116,6 @@ export function ImageUpload({
                 variant="ghost"
                 size="sm"
                 onClick={onCleared}
-                disabled={uploading}
                 className="text-rust"
               >
                 <X size={14} className="mr-2" />
@@ -113,17 +129,15 @@ export function ImageUpload({
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            disabled={uploading}
             className="w-full border-2 border-dashed border-border rounded-md p-6 flex flex-col items-center gap-2 text-muted-foreground hover:border-navy hover:text-navy transition-colors"
           >
             <ImageIcon size={24} />
-            <span className="text-sm">{uploading ? 'Uploading…' : 'Click to upload'}</span>
+            <span className="text-sm">Click to upload</span>
             <span className="text-xs">PNG, JPG, WebP, or SVG · max {maxSizeMB} MB</span>
           </button>
           <button
             type="button"
             onClick={() => setLibraryOpen(true)}
-            disabled={uploading}
             className="w-full text-xs text-muted-foreground hover:text-navy transition-colors py-1 flex items-center justify-center gap-1.5"
           >
             <Library size={12} />
