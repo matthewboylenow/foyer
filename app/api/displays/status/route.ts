@@ -43,12 +43,17 @@ export async function GET() {
   });
   const mediaIds = new Set<string>();
   if (tenantSettings?.logoMediaId) mediaIds.add(tenantSettings.logoMediaId);
+  // Gather media ids from BOTH content slots — a landscape display's
+  // current slide pulls from contentLandscape and we need its blob URLs too.
   for (const s of slideRows) {
-    const c = s.content as Record<string, unknown>;
-    if (typeof c?.logoMediaId === 'string') mediaIds.add(c.logoMediaId);
-    if (typeof c?.bgImageMediaId === 'string') mediaIds.add(c.bgImageMediaId);
-    if (typeof c?.bgVideoMediaId === 'string') mediaIds.add(c.bgVideoMediaId);
-    if (typeof c?.phoneMockupMediaId === 'string') mediaIds.add(c.phoneMockupMediaId);
+    for (const slot of [s.content, s.contentLandscape]) {
+      if (!slot || typeof slot !== 'object') continue;
+      const c = slot as Record<string, unknown>;
+      if (typeof c.logoMediaId === 'string') mediaIds.add(c.logoMediaId);
+      if (typeof c.bgImageMediaId === 'string') mediaIds.add(c.bgImageMediaId);
+      if (typeof c.bgVideoMediaId === 'string') mediaIds.add(c.bgVideoMediaId);
+      if (typeof c.phoneMockupMediaId === 'string') mediaIds.add(c.phoneMockupMediaId);
+    }
   }
   const mediaRows = mediaIds.size
     ? await db.query.media.findMany({ where: inArray(media.id, Array.from(mediaIds)) })
@@ -58,9 +63,28 @@ export async function GET() {
   const now = Date.now();
   const result = rows.map((d) => {
     const slide = d.currentSlideId ? slideMap.get(d.currentSlideId) ?? null : null;
+    const orientation = d.orientation === 'landscape' ? 'landscape' : 'portrait';
+    // Pick the orientation-appropriate content slot so the now-playing
+    // thumb matches what the TV is actually rendering. Empty slots fall
+    // back to the other side (the player's eligibility would have done
+    // the same).
+    function pickSlot(s: typeof slide): Record<string, unknown> | null {
+      if (!s) return null;
+      const primary = orientation === 'landscape' ? s.contentLandscape : s.content;
+      if (primary && typeof primary === 'object' && Object.keys(primary).length > 0) {
+        return primary as Record<string, unknown>;
+      }
+      const fallback = orientation === 'landscape' ? s.content : s.contentLandscape;
+      if (fallback && typeof fallback === 'object' && Object.keys(fallback).length > 0) {
+        return fallback as Record<string, unknown>;
+      }
+      return null;
+    }
+
+    const effectiveContent = pickSlot(slide);
     let resolvedMedia: Record<string, string> | undefined;
-    if (slide) {
-      const c = slide.content as Record<string, unknown>;
+    if (slide && effectiveContent) {
+      const c = effectiveContent;
       resolvedMedia = {};
       if (slide.templateType === 'parish_identity') {
         const slideLogoId = typeof c?.logoMediaId === 'string' ? c.logoMediaId : null;
@@ -89,6 +113,13 @@ export async function GET() {
     const status: 'online' | 'stale' | 'offline' =
       ageSec <= 90 ? 'online' : ageSec <= 300 ? 'stale' : 'offline';
 
+    // Replace content with the orientation-resolved slot so the consumer
+    // (DisplayManager thumbnail) renders the right layout without caring
+    // which side it came from.
+    const slideForResponse = slide && effectiveContent
+      ? { ...slide, content: effectiveContent }
+      : slide;
+
     return {
       id: d.id,
       name: d.name,
@@ -97,8 +128,8 @@ export async function GET() {
       status,
       lastHeartbeatAt: d.lastHeartbeatAt,
       currentSlideStartedAt: d.currentSlideStartedAt,
-      currentSlide: slide
-        ? ({ ...(slide as SlideWithContent), resolvedMedia } as SlideWithContent & {
+      currentSlide: slideForResponse
+        ? ({ ...(slideForResponse as SlideWithContent), resolvedMedia } as SlideWithContent & {
             resolvedMedia?: Record<string, string>;
           })
         : null,

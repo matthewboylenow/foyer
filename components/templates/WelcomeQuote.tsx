@@ -8,14 +8,17 @@ import { Drift } from '@/components/motion/Drift';
 import { WELCOME_QUOTE_SIZE, resolveSize } from './sizing';
 import { palette } from './style';
 import { BgLayer } from './BgLayer';
-import type { WelcomeQuoteContent } from '@/lib/db/schema';
+import type { WelcomeQuoteContent, SlideOrientation } from '@/lib/db/schema';
 
 interface WelcomeQuoteProps {
   content: WelcomeQuoteContent;
+  orientation?: SlideOrientation;
   bgImageUrl?: string;
 }
 
-export function WelcomeQuote({ content, bgImageUrl }: WelcomeQuoteProps) {
+export function WelcomeQuote({ content, orientation = 'portrait', bgImageUrl }: WelcomeQuoteProps) {
+  const isLandscape = orientation === 'landscape';
+  const padding = isLandscape ? '80px 160px' : '120px 80px';
   const { quote, attribution, quoteSize, textMode } = content;
   const sizePx = resolveSize(WELCOME_QUOTE_SIZE, quoteSize);
   const p = palette(textMode ?? 'dark');
@@ -28,7 +31,7 @@ export function WelcomeQuote({ content, bgImageUrl }: WelcomeQuoteProps) {
 
       <div
         className="relative z-10 flex flex-col items-center justify-center h-full text-center"
-        style={{ padding: '120px 80px' }}
+        style={{ padding }}
       >
         {/* Decorative open quote mark — drifts in and floats */}
         <BlurIn delay={0} duration={1400} y={-14}>

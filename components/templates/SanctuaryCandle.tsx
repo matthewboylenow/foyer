@@ -7,7 +7,7 @@ import { FilmGrain } from '@/components/motion/FilmGrain';
 import { GlowPulse } from '@/components/motion/GlowPulse';
 import { KenBurns } from '@/components/motion/KenBurns';
 import { SANCTUARY_CANDLE_NAME_SIZE, resolveSize } from './sizing';
-import type { SanctuaryCandleContent } from '@/lib/db/schema';
+import type { SanctuaryCandleContent, SlideOrientation } from '@/lib/db/schema';
 
 // Subtle "ember" particles drifting up — adds prayer-light atmosphere
 const EMBERS = Array.from({ length: 8 }, (_, i) => ({
@@ -20,13 +20,16 @@ const EMBERS = Array.from({ length: 8 }, (_, i) => ({
 
 interface SanctuaryCandleProps {
   content: SanctuaryCandleContent;
+  orientation?: SlideOrientation;
   bgImageUrl?: string;
 }
 
-export function SanctuaryCandle({ content, bgImageUrl }: SanctuaryCandleProps) {
+export function SanctuaryCandle({ content, orientation = 'portrait', bgImageUrl }: SanctuaryCandleProps) {
   const { name, inMemoryOf = true, nameSize } = content;
   const captionLine = inMemoryOf ? 'In Memory Of' : 'In Honor Of';
   const namePx = resolveSize(SANCTUARY_CANDLE_NAME_SIZE, nameSize);
+  const isLandscape = orientation === 'landscape';
+  const padding = isLandscape ? '60px 160px' : '120px 80px';
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-ink">
@@ -100,7 +103,7 @@ export function SanctuaryCandle({ content, bgImageUrl }: SanctuaryCandleProps) {
 
       <div
         className="relative z-10 flex flex-col items-center justify-center h-full text-center"
-        style={{ padding: '120px 80px' }}
+        style={{ padding }}
       >
         {/* Candle */}
         <motion.div

@@ -1,4 +1,4 @@
-import { getEligibleSlides } from '@/lib/db/queries';
+import { getEligibleSlides, getDisplayById } from '@/lib/db/queries';
 
 export async function GET(
   _req: Request,
@@ -7,12 +7,20 @@ export async function GET(
   const { displayId } = await params;
 
   try {
-    const slides = await getEligibleSlides(displayId);
-    return Response.json(slides, {
-      headers: { 'Cache-Control': 'no-store' },
-    });
+    const [display, slides] = await Promise.all([
+      getDisplayById(displayId),
+      getEligibleSlides(displayId),
+    ]);
+    const orientation = display?.orientation === 'landscape' ? 'landscape' : 'portrait';
+    return Response.json(
+      { orientation, slides },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
   } catch (err) {
     console.error('Display API error:', err);
-    return Response.json([], { status: 200, headers: { 'Cache-Control': 'no-store' } });
+    return Response.json(
+      { orientation: 'portrait', slides: [] },
+      { status: 200, headers: { 'Cache-Control': 'no-store' } },
+    );
   }
 }

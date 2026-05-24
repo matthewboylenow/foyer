@@ -11,12 +11,19 @@ export async function POST(req: Request) {
   const tenant = await getCurrentTenant();
   if (!tenant) return Response.json({ error: 'No tenant' }, { status: 400 });
 
-  const { name, location } = await req.json();
+  const { name, location, orientation } = await req.json();
   if (!name?.trim()) return Response.json({ error: 'Name required' }, { status: 400 });
+
+  const normalizedOrientation = orientation === 'landscape' ? 'landscape' : 'portrait';
 
   const [created] = await db
     .insert(displays)
-    .values({ tenantId: tenant.id, name: name.trim(), location: location?.trim() || null })
+    .values({
+      tenantId: tenant.id,
+      name: name.trim(),
+      location: location?.trim() || null,
+      orientation: normalizedOrientation,
+    })
     .returning();
 
   return Response.json(created, { status: 201 });

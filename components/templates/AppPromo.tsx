@@ -9,17 +9,19 @@ import { GlowPulse } from '@/components/motion/GlowPulse';
 import { KenBurns } from '@/components/motion/KenBurns';
 import { Drift } from '@/components/motion/Drift';
 import { APP_PROMO_HEADLINE_SIZE, resolveSize } from './sizing';
-import type { AppPromoContent } from '@/lib/db/schema';
+import type { AppPromoContent, SlideOrientation } from '@/lib/db/schema';
 
 interface AppPromoProps {
   content: AppPromoContent;
+  orientation?: SlideOrientation;
   bgImageUrl?: string;
   phoneMockupUrl?: string;
 }
 
-export function AppPromo({ content, bgImageUrl, phoneMockupUrl }: AppPromoProps) {
+export function AppPromo({ content, orientation = 'portrait', bgImageUrl, phoneMockupUrl }: AppPromoProps) {
   const { headline, body, url, headlineSize } = content;
   const headlinePx = resolveSize(APP_PROMO_HEADLINE_SIZE, headlineSize);
+  const isLandscape = orientation === 'landscape';
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-navy-900">
@@ -52,55 +54,113 @@ export function AppPromo({ content, bgImageUrl, phoneMockupUrl }: AppPromoProps)
 
       <FilmGrain opacity={0.05} />
 
-      <div
-        className="relative z-10 flex flex-col justify-between h-full"
-        style={{ padding: '120px 80px' }}
-      >
-        <div>
-          <h2
-            className="font-serif text-cream leading-[1.05] mb-8"
-            style={{ fontSize: headlinePx, letterSpacing: '-0.01em' }}
-          >
-            <LineMask text={headline} delay={0} duration={1000} />
-          </h2>
-          <BlurIn delay={1100} duration={1100} y={8} blur={6}>
-            <p
-              className="font-sans text-cream leading-relaxed"
-              style={{ fontSize: 48, opacity: 0.78 }}
+      {isLandscape ? (
+        // Landscape: text on the left, phone on the right — uses the
+        // extra horizontal real estate instead of stacking vertically.
+        <div
+          className="relative z-10 grid h-full items-center"
+          style={{
+            padding: '60px 100px',
+            gridTemplateColumns: phoneMockupUrl ? '1fr 1fr' : '1fr',
+            gap: 64,
+          }}
+        >
+          <div className="flex flex-col justify-center gap-8">
+            <h2
+              className="font-serif text-cream leading-[1.05]"
+              style={{ fontSize: headlinePx, letterSpacing: '-0.01em' }}
             >
-              <WordStagger text={body} delay={0} staggerMs={70} />
-            </p>
+              <LineMask text={headline} delay={0} duration={1000} />
+            </h2>
+            <BlurIn delay={1100} duration={1100} y={8} blur={6}>
+              <p
+                className="font-sans text-cream leading-relaxed"
+                style={{ fontSize: 40, opacity: 0.78 }}
+              >
+                <WordStagger text={body} delay={0} staggerMs={70} />
+              </p>
+            </BlurIn>
+            <BlurIn delay={2200} duration={900} y={6} blur={4} as="p">
+              <span
+                className="font-serif text-gold block"
+                style={{ fontSize: 56, textShadow: '0 4px 20px rgba(212,175,55,0.25)' }}
+              >
+                {url}
+              </span>
+            </BlurIn>
+          </div>
+
+          {phoneMockupUrl && (
+            <BlurIn delay={400} duration={1400} y={20} blur={14}>
+              <Drift duration={5000} y={14} scale={0.008}>
+                <div className="flex items-center justify-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={phoneMockupUrl}
+                    alt="App mockup"
+                    style={{
+                      maxHeight: 880,
+                      maxWidth: '100%',
+                      objectFit: 'contain',
+                      filter: 'drop-shadow(0 30px 60px rgba(0,0,0,0.4))',
+                    }}
+                  />
+                </div>
+              </Drift>
+            </BlurIn>
+          )}
+        </div>
+      ) : (
+        <div
+          className="relative z-10 flex flex-col justify-between h-full"
+          style={{ padding: '120px 80px' }}
+        >
+          <div>
+            <h2
+              className="font-serif text-cream leading-[1.05] mb-8"
+              style={{ fontSize: headlinePx, letterSpacing: '-0.01em' }}
+            >
+              <LineMask text={headline} delay={0} duration={1000} />
+            </h2>
+            <BlurIn delay={1100} duration={1100} y={8} blur={6}>
+              <p
+                className="font-sans text-cream leading-relaxed"
+                style={{ fontSize: 48, opacity: 0.78 }}
+              >
+                <WordStagger text={body} delay={0} staggerMs={70} />
+              </p>
+            </BlurIn>
+          </div>
+
+          {phoneMockupUrl && (
+            <BlurIn delay={400} duration={1400} y={20} blur={14}>
+              <Drift duration={5000} y={14} scale={0.008}>
+                <div className="flex items-center justify-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={phoneMockupUrl}
+                    alt="App mockup"
+                    style={{
+                      maxHeight: 620,
+                      objectFit: 'contain',
+                      filter: 'drop-shadow(0 30px 60px rgba(0,0,0,0.4))',
+                    }}
+                  />
+                </div>
+              </Drift>
+            </BlurIn>
+          )}
+
+          <BlurIn delay={2200} duration={900} y={6} blur={4} as="p">
+            <span
+              className="font-serif text-gold block"
+              style={{ fontSize: 64, textShadow: '0 4px 20px rgba(212,175,55,0.25)' }}
+            >
+              {url}
+            </span>
           </BlurIn>
         </div>
-
-        {phoneMockupUrl && (
-          <BlurIn delay={400} duration={1400} y={20} blur={14}>
-            <Drift duration={5000} y={14} scale={0.008}>
-              <div className="flex items-center justify-center">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={phoneMockupUrl}
-                  alt="App mockup"
-                  style={{
-                    maxHeight: 620,
-                    objectFit: 'contain',
-                    filter: 'drop-shadow(0 30px 60px rgba(0,0,0,0.4))',
-                  }}
-                />
-              </div>
-            </Drift>
-          </BlurIn>
-        )}
-
-        <BlurIn delay={2200} duration={900} y={6} blur={4} as="p">
-          <span
-            className="font-serif text-gold block"
-            style={{ fontSize: 64, textShadow: '0 4px 20px rgba(212,175,55,0.25)' }}
-          >
-            {url}
-          </span>
-        </BlurIn>
-      </div>
+      )}
     </div>
   );
 }

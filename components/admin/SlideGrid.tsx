@@ -3,7 +3,7 @@
 import { useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, X } from 'lucide-react';
+import { Plus, Search, X, RectangleVertical, RectangleHorizontal } from 'lucide-react';
 import { useHotkey } from '@/lib/useHotkey';
 import {
   DndContext,
@@ -37,6 +37,18 @@ interface SlideGridProps {
 }
 
 type StatusFilter = 'all' | 'active' | 'inactive';
+type OrientationFilter = 'all' | 'vertical' | 'horizontal';
+
+function slideHasPortrait(s: SlideCardData): boolean {
+  return !!s.content && typeof s.content === 'object' && Object.keys(s.content).length > 0;
+}
+function slideHasLandscape(s: SlideCardData): boolean {
+  return (
+    !!s.contentLandscape &&
+    typeof s.contentLandscape === 'object' &&
+    Object.keys(s.contentLandscape).length > 0
+  );
+}
 
 const TEMPLATE_LABELS = Object.fromEntries(
   Object.entries(templates).map(([k, v]) => [k, v.label]),
@@ -46,6 +58,7 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
   const router = useRouter();
   const [slides, setSlides] = useState<SlideCardData[]>(initialSlides);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [orientationFilter, setOrientationFilter] = useState<OrientationFilter>('all');
   const [collectionFilter, setCollectionFilter] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -81,6 +94,8 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
     return slides.filter((s) => {
       if (statusFilter === 'active' && !s.active) return false;
       if (statusFilter === 'inactive' && s.active) return false;
+      if (orientationFilter === 'vertical' && !slideHasPortrait(s)) return false;
+      if (orientationFilter === 'horizontal' && !slideHasLandscape(s)) return false;
       if (collectionFilter && s.collectionId !== collectionFilter) return false;
       if (!q) return true;
       const label = TEMPLATE_LABELS[s.templateType] ?? '';
@@ -90,13 +105,22 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
         s.templateType.toLowerCase().includes(q)
       );
     });
-  }, [slides, statusFilter, collectionFilter, query]);
+  }, [slides, statusFilter, orientationFilter, collectionFilter, query]);
 
   const counts = useMemo(
     () => ({
       all: slides.length,
       active: slides.filter((s) => s.active).length,
       inactive: slides.filter((s) => !s.active).length,
+    }),
+    [slides],
+  );
+
+  const orientationCounts = useMemo(
+    () => ({
+      all: slides.length,
+      vertical: slides.filter(slideHasPortrait).length,
+      horizontal: slides.filter(slideHasLandscape).length,
     }),
     [slides],
   );
@@ -307,6 +331,54 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
             </button>
           ))}
         </div>
+
+        {/* Orientation filter — V/H + counts. Hidden when every slide is
+            vertical (the historical state) to avoid clutter. */}
+        {orientationCounts.horizontal > 0 && (
+          <div className="flex gap-1.5 p-1 rounded-lg bg-navy/5 border border-navy/10">
+            <button
+              onClick={() => setOrientationFilter('all')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                orientationFilter === 'all'
+                  ? 'bg-cream text-navy shadow-sm'
+                  : 'text-navy/60 hover:text-navy'
+              }`}
+            >
+              Both
+              <span className="ml-1.5 font-mono text-[11px] text-navy/40">
+                {orientationCounts.all}
+              </span>
+            </button>
+            <button
+              onClick={() => setOrientationFilter('vertical')}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                orientationFilter === 'vertical'
+                  ? 'bg-cream text-navy shadow-sm'
+                  : 'text-navy/60 hover:text-navy'
+              }`}
+              aria-label="Filter to vertical slides"
+            >
+              <RectangleVertical size={13} />
+              <span className="font-mono text-[11px] text-navy/40">
+                {orientationCounts.vertical}
+              </span>
+            </button>
+            <button
+              onClick={() => setOrientationFilter('horizontal')}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                orientationFilter === 'horizontal'
+                  ? 'bg-cream text-navy shadow-sm'
+                  : 'text-navy/60 hover:text-navy'
+              }`}
+              aria-label="Filter to horizontal slides"
+            >
+              <RectangleHorizontal size={13} />
+              <span className="font-mono text-[11px] text-navy/40">
+                {orientationCounts.horizontal}
+              </span>
+            </button>
+          </div>
+        )}
 
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search

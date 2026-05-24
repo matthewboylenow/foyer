@@ -10,9 +10,9 @@ export const dynamic = 'force-dynamic';
 export default async function PreviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ slideId?: string }>;
+  searchParams: Promise<{ slideId?: string; orientation?: string }>;
 }) {
-  const { slideId } = await searchParams;
+  const { slideId, orientation: orientationParam } = await searchParams;
   if (!slideId) notFound();
 
   const slide = await getSlideById(slideId);
@@ -21,19 +21,48 @@ export default async function PreviewPage({
   const templateConfig = templates[slide.templateType];
   if (!templateConfig) notFound();
 
+  // Pick orientation from query string; default portrait. The editor's
+  // "Full size ↗" link passes `&orientation=landscape` for the landscape tab.
+  const orientation: 'portrait' | 'landscape' =
+    orientationParam === 'landscape' ? 'landscape' : 'portrait';
+
   // Resolve media URLs so the preview matches what the player will show.
   const tenant = await getCurrentTenant();
   const settings = tenant ? await getSettingsWithMedia(tenant.id) : null;
   const tenantLogoUrl = settings?.logoMedia?.blobUrl ?? null;
 
-  const content = slide.content as Record<string, unknown>;
+  // Pick the orientation-resolved content slot. If the requested orientation
+  // isn't authored, fall back to the other side so previewing always shows
+  // *something* rather than a blank canvas.
+  const portraitContent = slide.content as Record<string, unknown>;
+  const landscapeContent = slide.contentLandscape as Record<string, unknown> | null;
+  const portraitAuthored = portraitContent && Object.keys(portraitContent).length > 0;
+  const landscapeAuthored = landscapeContent && Object.keys(landscapeContent).length > 0;
+
+  let effectiveContent: Record<string, unknown> | null = null;
+  if (orientation === 'landscape') {
+    effectiveContent = landscapeAuthored
+      ? landscapeContent
+      : portraitAuthored
+        ? portraitContent
+        : null;
+  } else {
+    effectiveContent = portraitAuthored
+      ? portraitContent
+      : landscapeAuthored
+        ? landscapeContent
+        : null;
+  }
+  if (!effectiveContent) notFound();
+
   let logoUrl: string | null = null;
   let bgImageUrl: string | null = null;
   let bgVideoUrl: string | null = null;
   let phoneMockupUrl: string | null = null;
 
   if (slide.templateType === 'parish_identity') {
-    const slideLogoId = typeof content?.logoMediaId === 'string' ? content.logoMediaId : null;
+    const slideLogoId =
+      typeof effectiveContent.logoMediaId === 'string' ? effectiveContent.logoMediaId : null;
     if (slideLogoId) {
       const m = await getMediaById(slideLogoId);
       logoUrl = m?.blobUrl ?? null;
@@ -41,16 +70,16 @@ export default async function PreviewPage({
       logoUrl = tenantLogoUrl;
     }
   }
-  if (typeof content?.bgImageMediaId === 'string') {
-    const m = await getMediaById(content.bgImageMediaId);
+  if (typeof effectiveContent.bgImageMediaId === 'string') {
+    const m = await getMediaById(effectiveContent.bgImageMediaId);
     bgImageUrl = m?.blobUrl ?? null;
   }
-  if (typeof content?.bgVideoMediaId === 'string') {
-    const m = await getMediaById(content.bgVideoMediaId);
+  if (typeof effectiveContent.bgVideoMediaId === 'string') {
+    const m = await getMediaById(effectiveContent.bgVideoMediaId);
     bgVideoUrl = m?.blobUrl ?? null;
   }
-  if (typeof content?.phoneMockupMediaId === 'string') {
-    const m = await getMediaById(content.phoneMockupMediaId);
+  if (typeof effectiveContent.phoneMockupMediaId === 'string') {
+    const m = await getMediaById(effectiveContent.phoneMockupMediaId);
     phoneMockupUrl = m?.blobUrl ?? null;
   }
 
@@ -60,7 +89,8 @@ export default async function PreviewPage({
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
       <SlideComponent
-        content={slide.content as SlideWithContent['content']}
+        content={effectiveContent as SlideWithContent['content']}
+        orientation={orientation}
         logoUrl={logoUrl ?? undefined}
         bgImageUrl={bgImageUrl ?? undefined}
         bgVideoUrl={bgVideoUrl ?? undefined}

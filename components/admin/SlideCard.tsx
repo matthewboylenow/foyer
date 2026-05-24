@@ -2,7 +2,14 @@
 
 import Link from 'next/link';
 import { TimeAgo } from './TimeAgo';
-import { MoreHorizontal, GripVertical, Calendar, CheckCircle2 } from 'lucide-react';
+import {
+  MoreHorizontal,
+  GripVertical,
+  Calendar,
+  CheckCircle2,
+  RectangleVertical,
+  RectangleHorizontal,
+} from 'lucide-react';
 import { templates } from '@/components/templates';
 import {
   DropdownMenu,
@@ -19,13 +26,19 @@ const TEMPLATE_LABELS: Record<string, string> = Object.fromEntries(
 );
 
 // Card geometry — kept fixed so the preview scale calc is deterministic.
-// Templates are designed for 1080×1920; we render them at scale = CARD_W/1080.
+// Cards are always 240px wide; thumb height varies with the orientation
+// being previewed (portrait 1080×1920 → 426.66px; landscape 1920×1080 → 135px).
 const CARD_W = 240;
-const PREVIEW_SCALE = CARD_W / 1080;
-const PREVIEW_H = 1920 * PREVIEW_SCALE; // 426.66…
+const PORTRAIT_THUMB_H = 1920 * (CARD_W / 1080); // 426.66
+const LANDSCAPE_THUMB_H = 1080 * (CARD_W / 1920); // 135
 
 export interface SlideCardData extends Slide {
-  resolvedMedia?: Record<string, string>;
+  /** Per-orientation resolved blob URLs. Either side may be null when that
+   *  orientation is unauthored. */
+  resolvedMedia?: {
+    portrait: Record<string, string> | null;
+    landscape: Record<string, string> | null;
+  };
 }
 
 interface SlideCardProps {
@@ -60,7 +73,33 @@ export function SlideCard({
   const templateConfig = templates[slide.templateType];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const TemplateComponent = templateConfig?.component as React.ComponentType<any> | undefined;
-  const resolved = slide.resolvedMedia ?? {};
+  // Card shows whichever orientation is authored. For dual-orientation
+  // slides, prefer portrait (denser thumb, matches the historical default).
+  const portraitContent = slide.content as SlideContent;
+  const landscapeContent = slide.contentLandscape as SlideContent | null;
+  const portraitAuthored =
+    portraitContent && typeof portraitContent === 'object' && Object.keys(portraitContent).length > 0;
+  const landscapeAuthored = !!landscapeContent && Object.keys(landscapeContent as object).length > 0;
+  const previewOrientation: 'portrait' | 'landscape' = portraitAuthored
+    ? 'portrait'
+    : landscapeAuthored
+      ? 'landscape'
+      : 'portrait';
+  const previewContent: SlideContent | null =
+    previewOrientation === 'portrait'
+      ? portraitAuthored
+        ? portraitContent
+        : null
+      : landscapeContent;
+  const resolved =
+    (previewOrientation === 'portrait'
+      ? slide.resolvedMedia?.portrait
+      : slide.resolvedMedia?.landscape) ?? {};
+
+  const nativeW = previewOrientation === 'portrait' ? 1080 : 1920;
+  const nativeH = previewOrientation === 'portrait' ? 1920 : 1080;
+  const thumbH = previewOrientation === 'portrait' ? PORTRAIT_THUMB_H : LANDSCAPE_THUMB_H;
+  const thumbScale = CARD_W / nativeW;
   const scheduleLabel =
     slide.scheduleType === 'evergreen'
       ? 'Evergreen'
@@ -108,27 +147,29 @@ export function SlideCard({
         </button>
       )}
 
-      {/* Preview — 9:16 portrait. Renders the actual template at scaled size.
+      {/* Preview — orientation-aware. Portrait slides render at 9:16
+          (426px tall); landscape slides render at 16:9 (135px tall).
           .slide-thumb sets data-exiting so the ambient animations pause
           (defined in app/globals.css). */}
       <Link
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         href={`/admin/slides/${slide.id}` as any}
         className="block relative overflow-hidden rounded-t-xl bg-ink"
-        style={{ width: CARD_W, height: PREVIEW_H }}
+        style={{ width: CARD_W, height: thumbH }}
       >
-        {TemplateComponent && (
+        {TemplateComponent && previewContent && (
           <div
             className="absolute top-0 left-0 origin-top-left pointer-events-none slide-thumb"
             data-exiting="true"
             style={{
-              width: 1080,
-              height: 1920,
-              transform: `scale(${PREVIEW_SCALE})`,
+              width: nativeW,
+              height: nativeH,
+              transform: `scale(${thumbScale})`,
             }}
           >
             <TemplateComponent
-              content={slide.content as SlideContent}
+              content={previewContent}
+              orientation={previewOrientation}
               logoUrl={resolved.logoUrl}
               bgImageUrl={resolved.bgImageUrl}
               bgVideoUrl={resolved.bgVideoUrl}
@@ -181,9 +222,12 @@ export function SlideCard({
         </div>
 
         <div className="flex items-center justify-between gap-2 text-[11px]">
-          <span className="font-mono uppercase tracking-widest text-navy/50 truncate">
-            {TEMPLATE_LABELS[slide.templateType] ?? slide.templateType}
-          </span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-mono uppercase tracking-widest text-navy/50 truncate">
+              {TEMPLATE_LABELS[slide.templateType] ?? slide.templateType}
+            </span>
+            <OrientationPill portrait={portraitAuthored} landscape={landscapeAuthored} />
+          </div>
           <Switch
             checked={slide.active}
             onCheckedChange={() => onActiveToggle(slide.id, slide.active)}
@@ -215,3 +259,34 @@ export function SlideCard({
 }
 
 export { CARD_W };
+
+/**
+ * Small pill showing which orientations this slide is authored in.
+ * V = vertical only, H = horizontal only, V+H = both.
+ * Exported so SlideGrid filter chips can use the same visual vocabulary.
+ */
+export function OrientationPill({
+  portrait,
+  landscape,
+}: {
+  portrait: boolean;
+  landscape: boolean;
+}) {
+  if (!portrait && !landscape) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-navy/8 text-navy/60 font-medium"
+      style={{ fontSize: 10 }}
+      title={
+        portrait && landscape
+          ? 'Vertical + horizontal'
+          : portrait
+            ? 'Vertical only'
+            : 'Horizontal only'
+      }
+    >
+      {portrait && <RectangleVertical size={10} />}
+      {landscape && <RectangleHorizontal size={10} />}
+    </span>
+  );
+}

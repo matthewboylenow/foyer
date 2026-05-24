@@ -39,7 +39,7 @@ export async function PATCH(
   };
 
   const allowed = [
-    'title', 'content', 'scheduleType', 'startAt', 'endAt',
+    'title', 'content', 'contentLandscape', 'scheduleType', 'startAt', 'endAt',
     'active', 'weight', 'durationOverrideSec', 'targetDisplays',
     'collectionId',
   ];
@@ -48,10 +48,39 @@ export async function PATCH(
     if (key in body) {
       if (key === 'startAt' || key === 'endAt') {
         updateData[key] = body[key] ? new Date(body[key]) : null;
+      } else if (key === 'content') {
+        // Empty-object content means "unauthor portrait" — keep the column
+        // shape (NOT NULL) so existing query code stays simple.
+        const c = body[key];
+        updateData[key] = c && typeof c === 'object' && Object.keys(c).length > 0 ? c : {};
+      } else if (key === 'contentLandscape') {
+        // Empty / null landscape becomes null so the column reads as
+        // "unauthored" and slides.contentLandscape can stay nullable.
+        const c = body[key];
+        updateData[key] =
+          c && typeof c === 'object' && Object.keys(c).length > 0 ? c : null;
       } else {
         updateData[key] = body[key];
       }
     }
+  }
+
+  // After applying the update, at least one orientation must still be authored.
+  const willHavePortrait =
+    'content' in updateData
+      ? Object.keys((updateData.content as Record<string, unknown>) ?? {}).length > 0
+      : Object.keys((existing.content as Record<string, unknown>) ?? {}).length > 0;
+  const willHaveLandscape =
+    'contentLandscape' in updateData
+      ? !!updateData.contentLandscape &&
+        Object.keys(updateData.contentLandscape as Record<string, unknown>).length > 0
+      : !!existing.contentLandscape &&
+        Object.keys(existing.contentLandscape as Record<string, unknown>).length > 0;
+  if (!willHavePortrait && !willHaveLandscape) {
+    return Response.json(
+      { error: 'Slide must have content for at least one orientation' },
+      { status: 400 },
+    );
   }
 
   const [updated] = await db

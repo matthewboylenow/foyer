@@ -5,17 +5,32 @@ import { BlurIn } from '@/components/motion/BlurIn';
 import { FilmGrain } from '@/components/motion/FilmGrain';
 import { palette } from './style';
 import { BgLayer } from './BgLayer';
-import type { WeeklyAssociationContent } from '@/lib/db/schema';
+import type { WeeklyAssociationContent, SlideOrientation } from '@/lib/db/schema';
 
 interface WeeklyAssociationProps {
   content: WeeklyAssociationContent;
+  orientation?: SlideOrientation;
   bgImageUrl?: string;
 }
 
-export function WeeklyAssociation({ content, bgImageUrl }: WeeklyAssociationProps) {
+export function WeeklyAssociation({ content, orientation = 'portrait', bgImageUrl }: WeeklyAssociationProps) {
   const { names, textMode } = content;
   const p = palette(textMode ?? 'dark');
-  const fontSize = names.length > 7 ? Math.max(32, 44 - (names.length - 7) * 2) : 44;
+  const isLandscape = orientation === 'landscape';
+
+  // In landscape, names flow into a 2- or 3-column grid so the slide
+  // doesn't read as a thin vertical list squashed in a wide canvas.
+  // Floor at 2 columns even for short lists (a single column on a
+  // 1920-wide canvas reads as forgotten content), cap at 3 — beyond that
+  // names look like a roster, not a remembrance.
+  const columns = isLandscape ? Math.min(3, Math.max(2, Math.ceil(names.length / 5))) : 1;
+  const fontSize = isLandscape
+    ? names.length > 12
+      ? Math.max(28, 40 - (names.length - 12) * 1)
+      : 40
+    : names.length > 7
+      ? Math.max(32, 44 - (names.length - 7) * 2)
+      : 44;
 
   return (
     <div className={`relative w-full h-full overflow-hidden ${p.pageBg}`}>
@@ -25,7 +40,7 @@ export function WeeklyAssociation({ content, bgImageUrl }: WeeklyAssociationProp
 
       <div
         className="relative z-10 flex flex-col items-center h-full"
-        style={{ padding: '120px 80px' }}
+        style={{ padding: isLandscape ? '60px 120px' : '120px 80px' }}
       >
         <BlurIn delay={0} duration={1100} y={8}>
           <div className="text-center mb-6">
@@ -51,18 +66,40 @@ export function WeeklyAssociation({ content, bgImageUrl }: WeeklyAssociationProp
           transition={{ duration: 1.2, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
         />
 
-        <div className="flex flex-col items-center gap-y-5 w-full">
-          {names.map((name, i) => (
-            <BlurIn key={i} delay={1100 + i * 220} duration={900} y={10}>
-              <p
-                className={`font-serif text-center leading-tight ${p.primary}`}
-                style={{ fontSize, letterSpacing: '-0.005em' }}
-              >
-                {name}
-              </p>
-            </BlurIn>
-          ))}
-        </div>
+        {columns === 1 ? (
+          <div className="flex flex-col items-center gap-y-5 w-full">
+            {names.map((name, i) => (
+              <BlurIn key={i} delay={1100 + i * 220} duration={900} y={10}>
+                <p
+                  className={`font-serif text-center leading-tight ${p.primary}`}
+                  style={{ fontSize, letterSpacing: '-0.005em' }}
+                >
+                  {name}
+                </p>
+              </BlurIn>
+            ))}
+          </div>
+        ) : (
+          <div
+            className="grid w-full"
+            style={{
+              gridTemplateColumns: `repeat(${columns}, 1fr)`,
+              columnGap: 64,
+              rowGap: 20,
+            }}
+          >
+            {names.map((name, i) => (
+              <BlurIn key={i} delay={1100 + i * 160} duration={900} y={10}>
+                <p
+                  className={`font-serif text-center leading-tight ${p.primary}`}
+                  style={{ fontSize, letterSpacing: '-0.005em' }}
+                >
+                  {name}
+                </p>
+              </BlurIn>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -9,17 +9,20 @@ import { AutoFitText } from './AutoFitText';
 import { GENERAL_HEADLINE_SIZE, resolveSize } from './sizing';
 import { palette } from './style';
 import { BgLayer } from './BgLayer';
-import type { GeneralContent } from '@/lib/db/schema';
+import type { GeneralContent, SlideOrientation } from '@/lib/db/schema';
 
 interface GeneralProps {
   content: GeneralContent;
+  orientation?: SlideOrientation;
   bgImageUrl?: string;
 }
 
-export function General({ content, bgImageUrl }: GeneralProps) {
+export function General({ content, orientation = 'portrait', bgImageUrl }: GeneralProps) {
   const { headline, body, meta, headlineSize, motionStyle = 'lineMask', textMode } = content;
   const headlinePx = resolveSize(GENERAL_HEADLINE_SIZE, headlineSize);
   const p = palette(textMode ?? 'dark');
+  const isLandscape = orientation === 'landscape';
+  const padding = isLandscape ? '80px 160px' : '120px 80px';
 
   return (
     <div className={`relative w-full h-full overflow-hidden ${p.pageBg}`}>
@@ -37,7 +40,7 @@ export function General({ content, bgImageUrl }: GeneralProps) {
 
       <div
         className="relative z-10 flex flex-col h-full"
-        style={{ padding: '120px 80px' }}
+        style={{ padding }}
       >
         {/* Headline */}
         <h2

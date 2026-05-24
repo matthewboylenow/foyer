@@ -6,32 +6,55 @@ import { SlideErrorBoundary } from './SlideErrorBoundary';
 import { buildShuffledPool, slidesHaveChanged } from './shuffle';
 import { templates } from '@/components/templates';
 import { reportError } from '@/lib/reportError';
-import type { SlideWithContent } from '@/lib/db/schema';
+import type { SlideOrientation } from '@/lib/db/schema';
 
-type PlayerSlide = SlideWithContent & {
+type PlayerSlide = {
+  id: string;
+  tenantId: string;
+  templateType: keyof typeof templates;
+  title: string;
+  content: Record<string, unknown>;
+  scheduleType: 'evergreen' | 'dated';
+  startAt: string | Date | null;
+  endAt: string | Date | null;
+  targetDisplays: unknown;
+  active: boolean;
+  weight: number;
+  durationOverrideSec: number | null;
+  collectionId: string | null;
+  displayOrder: number;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+  createdBy: string | null;
+  updatedBy: string | null;
   resolvedMedia?: Record<string, string>;
 };
 
+type ApiResponse = { orientation: SlideOrientation; slides: PlayerSlide[] };
+
+// Bumped from v0 (slides[]) to v1 ({ orientation, slides }) — old cache entries
+// from before v1.9 won't deserialize correctly, so the new key invalidates them.
+const CACHE_KEY_PREFIX = 'lastFetch.v1';
 const POLL_INTERVAL_MS = 30_000;
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-function loadFromCache(displayId: string): PlayerSlide[] {
+function loadFromCache(displayId: string): ApiResponse | null {
   try {
-    const raw = localStorage.getItem(`lastFetch:${displayId}`);
-    if (!raw) return [];
-    const { slides, savedAt } = JSON.parse(raw) as { slides: PlayerSlide[]; savedAt: number };
-    if (Date.now() - savedAt > CACHE_TTL_MS) return [];
-    return slides;
+    const raw = localStorage.getItem(`${CACHE_KEY_PREFIX}:${displayId}`);
+    if (!raw) return null;
+    const { data, savedAt } = JSON.parse(raw) as { data: ApiResponse; savedAt: number };
+    if (Date.now() - savedAt > CACHE_TTL_MS) return null;
+    return data;
   } catch {
-    return [];
+    return null;
   }
 }
 
-function saveToCache(displayId: string, slides: PlayerSlide[]) {
+function saveToCache(displayId: string, data: ApiResponse) {
   try {
     localStorage.setItem(
-      `lastFetch:${displayId}`,
-      JSON.stringify({ slides, savedAt: Date.now() }),
+      `${CACHE_KEY_PREFIX}:${displayId}`,
+      JSON.stringify({ data, savedAt: Date.now() }),
     );
   } catch {
     // localStorage unavailable or full — skip
@@ -68,6 +91,7 @@ interface PlayerProps {
 }
 
 export function Player({ displayId }: PlayerProps) {
+  const [orientation, setOrientation] = useState<SlideOrientation>('portrait');
   const [slides, setSlides] = useState<PlayerSlide[]>([]);
   const [pool, setPool] = useState<PlayerSlide[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -128,11 +152,12 @@ export function Player({ displayId }: PlayerProps) {
       try {
         const res = await fetch(`/api/display/${displayId}`, { cache: 'no-store' });
         if (res.ok) {
-          const data: PlayerSlide[] = await res.json();
-          if (data.length > 0) {
+          const data = (await res.json()) as ApiResponse;
+          if (data?.slides && data.slides.length > 0) {
             saveToCache(displayId, data);
-            setSlides(data);
-            setPool(buildShuffledPool(data));
+            setOrientation(data.orientation);
+            setSlides(data.slides);
+            setPool(buildShuffledPool(data.slides));
             setReady(true);
             return;
           }
@@ -142,9 +167,10 @@ export function Player({ displayId }: PlayerProps) {
       }
 
       const cached = loadFromCache(displayId);
-      if (cached.length > 0) {
-        setSlides(cached);
-        setPool(buildShuffledPool(cached));
+      if (cached?.slides && cached.slides.length > 0) {
+        setOrientation(cached.orientation);
+        setSlides(cached.slides);
+        setPool(buildShuffledPool(cached.slides));
       } else {
         setSlides([FALLBACK_SLIDE]);
         setPool([FALLBACK_SLIDE]);
@@ -161,9 +187,13 @@ export function Player({ displayId }: PlayerProps) {
       try {
         const res = await fetch(`/api/display/${displayId}`, { cache: 'no-store' });
         if (!res.ok) return;
-        const data: PlayerSlide[] = await res.json();
-        if (slidesHaveChanged(slides, data)) {
-          queuedSlidesRef.current = data;
+        const data = (await res.json()) as ApiResponse;
+        if (!data?.slides) return;
+        // Orientation can change live if the admin flips a display; update
+        // immediately so subsequent renders use the new aspect / templates.
+        if (data.orientation !== orientation) setOrientation(data.orientation);
+        if (slidesHaveChanged(slides, data.slides)) {
+          queuedSlidesRef.current = data.slides;
           saveToCache(displayId, data);
         }
       } catch {
@@ -171,7 +201,7 @@ export function Player({ displayId }: PlayerProps) {
       }
     }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [displayId, slides, ready]);
+  }, [displayId, slides, ready, orientation]);
 
   // Pre-decode the next slide's media during the current slide's hold so
   // image decode never blocks the cross-dissolve. Without this, the new
@@ -361,6 +391,7 @@ export function Player({ displayId }: PlayerProps) {
         >
           <SlideComponent
             content={current.content}
+            orientation={orientation}
             logoUrl={resolved.logoUrl}
             bgImageUrl={resolved.bgImageUrl}
             bgVideoUrl={resolved.bgVideoUrl}

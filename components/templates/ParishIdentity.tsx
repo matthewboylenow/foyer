@@ -13,10 +13,11 @@ import {
   resolveSize,
   resolveLogoWidth,
 } from './sizing';
-import type { ParishIdentityContent } from '@/lib/db/schema';
+import type { ParishIdentityContent, SlideOrientation } from '@/lib/db/schema';
 
 interface ParishIdentityProps {
   content: ParishIdentityContent;
+  orientation?: SlideOrientation;
   logoUrl?: string;
   bgImageUrl?: string;
   bgVideoUrl?: string;
@@ -47,7 +48,7 @@ function parseSublineLines(html: string): string[] {
     .filter(Boolean);
 }
 
-export function ParishIdentity({ content, logoUrl, bgImageUrl, bgVideoUrl }: ParishIdentityProps) {
+export function ParishIdentity({ content, orientation = 'portrait', logoUrl, bgImageUrl, bgVideoUrl }: ParishIdentityProps) {
   const { headline, subline, logoSize, headlineSize } = content;
 
   const logoMaxWidth = resolveLogoWidth(logoSize);
@@ -55,6 +56,8 @@ export function ParishIdentity({ content, logoUrl, bgImageUrl, bgVideoUrl }: Par
   const lines = subline ? parseSublineLines(subline) : [];
 
   const hasMedia = Boolean(bgVideoUrl || bgImageUrl);
+  const isLandscape = orientation === 'landscape';
+  const padding = isLandscape ? '60px 160px' : '120px 80px';
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-navy-900">
@@ -115,7 +118,7 @@ export function ParishIdentity({ content, logoUrl, bgImageUrl, bgVideoUrl }: Par
 
       <div
         className="relative z-10 flex flex-col items-center justify-center h-full"
-        style={{ padding: '120px 80px' }}
+        style={{ padding }}
       >
         {logoUrl && (
           <BlurIn delay={200} duration={1400} y={20} blur={14} className="mb-14">

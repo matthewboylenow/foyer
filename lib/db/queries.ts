@@ -1,9 +1,32 @@
 import { eq, and, or, isNull, lte, gte, asc, desc } from 'drizzle-orm';
 import { db } from './client';
 import { slides, displays, settings, tenants, auditLog, errors, collections, media } from './schema';
-import type { SlideWithContent } from './schema';
+import type { SlideWithContent, SlideContent, SlideOrientation } from './schema';
 
-export type EligibleSlide = SlideWithContent & {
+/**
+ * Picks the orientation-appropriate content slot for a slide and reports
+ * whether that slot is actually populated. An empty `content` object ({})
+ * counts as "no portrait content" — same for a null `contentLandscape`.
+ */
+function pickContent(
+  slide: { content: unknown; contentLandscape: unknown },
+  orientation: SlideOrientation,
+): { effective: SlideContent | null; available: boolean } {
+  const raw = orientation === 'landscape' ? slide.contentLandscape : slide.content;
+  if (raw == null) return { effective: null, available: false };
+  if (typeof raw !== 'object') return { effective: null, available: false };
+  // Empty object = unauthored for this orientation
+  if (Object.keys(raw as Record<string, unknown>).length === 0) {
+    return { effective: null, available: false };
+  }
+  return { effective: raw as SlideContent, available: true };
+}
+
+/**
+ * Returned to the player. `content` is the orientation-resolved content
+ * (no more `contentLandscape` field) so existing template props "just work."
+ */
+export type EligibleSlide = Omit<SlideWithContent, 'contentLandscape'> & {
   /** Resolved blob URLs for any media referenced by content (filled server-side) */
   resolvedMedia?: Record<string, string>;
 };
@@ -13,6 +36,8 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
     where: eq(displays.id, displayId),
   });
   if (!display || !display.active) return [];
+
+  const orientation = (display.orientation === 'landscape' ? 'landscape' : 'portrait') as SlideOrientation;
 
   const now = new Date();
   const eligible = await db.query.slides.findMany({
@@ -31,12 +56,21 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
     orderBy: [desc(slides.updatedAt)],
   });
 
-  const filtered = eligible.filter((s) => {
+  // Filter by display targeting AND by orientation availability. A slide
+  // with empty content for this display's orientation is filtered out —
+  // marked portrait-only doesn't run on a landscape screen and vice versa.
+  type SlidePicked = (typeof eligible)[number] & { _effective: SlideContent };
+  const filtered: SlidePicked[] = [];
+  for (const s of eligible) {
     const targets = (s.targetDisplays as string[]) ?? [];
-    return targets.length === 0 || targets.includes(displayId);
-  });
+    if (targets.length > 0 && !targets.includes(displayId)) continue;
+    const { effective, available } = pickContent(s, orientation);
+    if (!available || !effective) continue;
+    filtered.push({ ...s, _effective: effective });
+  }
 
-  // Resolve media references — gather all media IDs, look them up, attach URLs.
+  // Resolve media references — gather all media IDs from the EFFECTIVE
+  // (orientation-resolved) content, look them up, attach URLs.
   const tenantSettings = await db.query.settings.findFirst({
     where: eq(settings.tenantId, display.tenantId),
   });
@@ -44,7 +78,7 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
   const mediaIds = new Set<string>();
   if (tenantSettings?.logoMediaId) mediaIds.add(tenantSettings.logoMediaId);
   for (const s of filtered) {
-    const c = s.content as Record<string, unknown>;
+    const c = s._effective as unknown as Record<string, unknown>;
     if (typeof c?.logoMediaId === 'string') mediaIds.add(c.logoMediaId);
     if (typeof c?.bgImageMediaId === 'string') mediaIds.add(c.bgImageMediaId);
     if (typeof c?.bgVideoMediaId === 'string') mediaIds.add(c.bgVideoMediaId);
@@ -57,7 +91,7 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
   const mediaMap = new Map(mediaRows.map((m) => [m.id, m.blobUrl]));
 
   return filtered.map((s): EligibleSlide => {
-    const c = s.content as Record<string, unknown>;
+    const c = s._effective as unknown as Record<string, unknown>;
     const resolved: Record<string, string> = {};
     // For ParishIdentity: fall back to tenant logo if slide doesn't override
     if (s.templateType === 'parish_identity') {
@@ -80,7 +114,11 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
       const url = mediaMap.get(c.phoneMockupMediaId);
       if (url) resolved.phoneMockupUrl = url;
     }
-    return { ...(s as SlideWithContent), resolvedMedia: resolved };
+    // Strip contentLandscape from the returned shape and replace content
+    // with the orientation-resolved effective content.
+    const { content: _origContent, contentLandscape: _origLandscape, _effective, ...rest } = s;
+    void _origContent; void _origLandscape;
+    return { ...rest, content: _effective, resolvedMedia: resolved };
   });
 }
 
@@ -106,7 +144,70 @@ export async function getSlideById(id: string) {
  * phone mockup). Falls back to tenant logo for parish_identity slides
  * that don't override.
  */
-export async function getSlidesByTenantWithMedia(tenantId: string) {
+/**
+ * Collects every media id referenced anywhere in a content blob (handles
+ * null/empty/non-object safely).
+ */
+function collectContentMediaIds(content: unknown, sink: Set<string>) {
+  if (!content || typeof content !== 'object') return;
+  const c = content as Record<string, unknown>;
+  if (typeof c.logoMediaId === 'string') sink.add(c.logoMediaId);
+  if (typeof c.bgImageMediaId === 'string') sink.add(c.bgImageMediaId);
+  if (typeof c.bgVideoMediaId === 'string') sink.add(c.bgVideoMediaId);
+  if (typeof c.phoneMockupMediaId === 'string') sink.add(c.phoneMockupMediaId);
+}
+
+/**
+ * Resolves a single content blob's media ids to blob URLs. Returns null
+ * if the content is empty / unauthored (so the caller can mark that
+ * orientation as unavailable for this slide).
+ */
+function resolveContentMedia(
+  content: unknown,
+  templateType: string,
+  tenantLogoMediaId: string | null,
+  mediaMap: Map<string, string>,
+): Record<string, string> | null {
+  if (!content || typeof content !== 'object') return null;
+  if (Object.keys(content as Record<string, unknown>).length === 0) return null;
+  const c = content as Record<string, unknown>;
+  const resolved: Record<string, string> = {};
+  if (templateType === 'parish_identity') {
+    const slideLogoId = typeof c.logoMediaId === 'string' ? c.logoMediaId : null;
+    const effectiveLogoId = slideLogoId ?? tenantLogoMediaId ?? null;
+    if (effectiveLogoId) {
+      const url = mediaMap.get(effectiveLogoId);
+      if (url) resolved.logoUrl = url;
+    }
+  }
+  if (typeof c.bgImageMediaId === 'string') {
+    const url = mediaMap.get(c.bgImageMediaId);
+    if (url) resolved.bgImageUrl = url;
+  }
+  if (typeof c.bgVideoMediaId === 'string') {
+    const url = mediaMap.get(c.bgVideoMediaId);
+    if (url) resolved.bgVideoUrl = url;
+  }
+  if (typeof c.phoneMockupMediaId === 'string') {
+    const url = mediaMap.get(c.phoneMockupMediaId);
+    if (url) resolved.phoneMockupUrl = url;
+  }
+  return resolved;
+}
+
+/**
+ * Returned to the admin grid. `resolvedMedia` is per-orientation so the
+ * card can preview either tab. Either side may be null when that
+ * orientation is unauthored.
+ */
+export type SlideWithResolvedMedia = Awaited<ReturnType<typeof getSlidesByTenant>>[number] & {
+  resolvedMedia: {
+    portrait: Record<string, string> | null;
+    landscape: Record<string, string> | null;
+  };
+};
+
+export async function getSlidesByTenantWithMedia(tenantId: string): Promise<SlideWithResolvedMedia[]> {
   const list = await getSlidesByTenant(tenantId);
   const tenantSettings = await db.query.settings.findFirst({
     where: eq(settings.tenantId, tenantId),
@@ -115,43 +216,23 @@ export async function getSlidesByTenantWithMedia(tenantId: string) {
   const mediaIds = new Set<string>();
   if (tenantSettings?.logoMediaId) mediaIds.add(tenantSettings.logoMediaId);
   for (const s of list) {
-    const c = s.content as Record<string, unknown>;
-    if (typeof c?.logoMediaId === 'string') mediaIds.add(c.logoMediaId);
-    if (typeof c?.bgImageMediaId === 'string') mediaIds.add(c.bgImageMediaId);
-    if (typeof c?.bgVideoMediaId === 'string') mediaIds.add(c.bgVideoMediaId);
-    if (typeof c?.phoneMockupMediaId === 'string') mediaIds.add(c.phoneMockupMediaId);
+    collectContentMediaIds(s.content, mediaIds);
+    collectContentMediaIds(s.contentLandscape, mediaIds);
   }
 
   const mediaRows = mediaIds.size > 0
     ? await db.query.media.findMany({ where: (m, { inArray }) => inArray(m.id, Array.from(mediaIds)) })
     : [];
   const mediaMap = new Map(mediaRows.map((m) => [m.id, m.blobUrl]));
+  const tenantLogoId = tenantSettings?.logoMediaId ?? null;
 
-  return list.map((s) => {
-    const c = s.content as Record<string, unknown>;
-    const resolvedMedia: Record<string, string> = {};
-    if (s.templateType === 'parish_identity') {
-      const slideLogoId = typeof c?.logoMediaId === 'string' ? c.logoMediaId : null;
-      const effectiveLogoId = slideLogoId ?? tenantSettings?.logoMediaId;
-      if (effectiveLogoId) {
-        const url = mediaMap.get(effectiveLogoId);
-        if (url) resolvedMedia.logoUrl = url;
-      }
-    }
-    if (typeof c?.bgImageMediaId === 'string') {
-      const url = mediaMap.get(c.bgImageMediaId);
-      if (url) resolvedMedia.bgImageUrl = url;
-    }
-    if (typeof c?.bgVideoMediaId === 'string') {
-      const url = mediaMap.get(c.bgVideoMediaId);
-      if (url) resolvedMedia.bgVideoUrl = url;
-    }
-    if (typeof c?.phoneMockupMediaId === 'string') {
-      const url = mediaMap.get(c.phoneMockupMediaId);
-      if (url) resolvedMedia.phoneMockupUrl = url;
-    }
-    return { ...s, resolvedMedia };
-  });
+  return list.map((s) => ({
+    ...s,
+    resolvedMedia: {
+      portrait: resolveContentMedia(s.content, s.templateType, tenantLogoId, mediaMap),
+      landscape: resolveContentMedia(s.contentLandscape, s.templateType, tenantLogoId, mediaMap),
+    },
+  }));
 }
 
 export async function getDisplaysByTenant(tenantId: string) {

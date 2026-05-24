@@ -1,4 +1,9 @@
-import type { SlideWithContent } from '@/lib/db/schema';
+// Helpers operate on any slide-like type with id/updatedAt/weight — keeping
+// these generic lets the player pass its own PlayerSlide shape (where Dates
+// have been JSON-stringified) without fighting the SlideWithContent type.
+
+type Weighted = { weight?: number | null };
+type IdAndUpdated = { id: string; updatedAt: string | Date };
 
 export function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -9,8 +14,8 @@ export function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-export function expandByWeight(slides: SlideWithContent[]): SlideWithContent[] {
-  const pool: SlideWithContent[] = [];
+export function expandByWeight<T extends Weighted>(slides: T[]): T[] {
+  const pool: T[] = [];
   for (const s of slides) {
     const w = s.weight ?? 1;
     if (w >= 1) {
@@ -22,16 +27,16 @@ export function expandByWeight(slides: SlideWithContent[]): SlideWithContent[] {
   return pool;
 }
 
-export function buildShuffledPool(slides: SlideWithContent[]): SlideWithContent[] {
+export function buildShuffledPool<T extends Weighted>(slides: T[]): T[] {
   const pool = expandByWeight(slides);
   return shuffle(pool.length > 0 ? pool : slides);
 }
 
-export function slidesHaveChanged(a: SlideWithContent[], b: SlideWithContent[]): boolean {
+export function slidesHaveChanged<T extends IdAndUpdated>(a: T[], b: T[]): boolean {
   if (a.length !== b.length) return true;
-  const aIds = new Set(a.map((s) => `${s.id}:${s.updatedAt}`));
+  const aIds = new Set(a.map((s) => `${s.id}:${String(s.updatedAt)}`));
   for (const s of b) {
-    if (!aIds.has(`${s.id}:${s.updatedAt}`)) return true;
+    if (!aIds.has(`${s.id}:${String(s.updatedAt)}`)) return true;
   }
   return false;
 }

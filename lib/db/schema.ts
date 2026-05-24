@@ -43,6 +43,11 @@ export const displays = pgTable('displays', {
   name: text('name').notNull(),
   location: text('location'),
   active: boolean('active').default(true).notNull(),
+  /** Physical mounting orientation of the TV. 'portrait' = 1080×1920,
+   *  'landscape' = 1920×1080. Stored as text (not enum) so we can add
+   *  values like 'square' later without a migration. Drives which
+   *  content (`content` vs `contentLandscape`) the player receives. */
+  orientation: text('orientation').default('portrait').notNull(),
   /** ID of the slide the player last reported as currently visible. Null
    *  if the player has never heart-beat (new display) or after a wipe. */
   currentSlideId: uuid('current_slide_id'),
@@ -112,7 +117,15 @@ export const slides = pgTable('slides', {
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
   templateType: slideTemplateEnum('template_type').notNull(),
   title: text('title').notNull(),
+  /** Portrait content (1080×1920). The original/default content slot.
+   *  Empty object ({}) means this slide is NOT available on portrait
+   *  displays (use `contentLandscape` only). */
   content: jsonb('content').notNull().default({}),
+  /** Optional landscape content (1920×1080). Null means this slide is
+   *  NOT available on landscape displays. Allows per-orientation authoring
+   *  so a Mass Schedule can have a stacked portrait layout and a
+   *  side-by-side landscape layout without two separate slide rows. */
+  contentLandscape: jsonb('content_landscape'),
   scheduleType: scheduleTypeEnum('schedule_type').default('evergreen').notNull(),
   startAt: timestamp('start_at', { withTimezone: true }),
   endAt: timestamp('end_at', { withTimezone: true }),
@@ -357,4 +370,9 @@ export type CollectionColor =
   | 'plum'
   | 'sky';
 
-export type SlideWithContent = Omit<Slide, 'content'> & { content: SlideContent };
+export type SlideWithContent = Omit<Slide, 'content' | 'contentLandscape'> & {
+  content: SlideContent;
+  contentLandscape: SlideContent | null;
+};
+
+export type SlideOrientation = 'portrait' | 'landscape';

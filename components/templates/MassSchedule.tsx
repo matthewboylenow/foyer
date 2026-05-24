@@ -5,7 +5,7 @@ import { LineMask } from '@/components/motion/LineMask';
 import { FilmGrain } from '@/components/motion/FilmGrain';
 import { palette } from './style';
 import { BgLayer } from './BgLayer';
-import type { MassScheduleContent, MassScheduleRow, TextMode } from '@/lib/db/schema';
+import type { MassScheduleContent, MassScheduleRow, TextMode, SlideOrientation } from '@/lib/db/schema';
 
 const EASING: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -85,18 +85,26 @@ function SectionTitle({ text, delay, accentClass }: { text: string; delay: numbe
 
 interface MassScheduleProps {
   content: MassScheduleContent;
+  orientation?: SlideOrientation;
   bgImageUrl?: string;
 }
 
-export function MassSchedule({ content, bgImageUrl }: MassScheduleProps) {
+export function MassSchedule({ content, orientation = 'portrait', bgImageUrl }: MassScheduleProps) {
   const { weekendLabel, weekendRows, weekdayRows } = normalize(content);
   const totalRows = weekendRows.length + weekdayRows.length;
   const hasBoth = weekendRows.length > 0 && weekdayRows.length > 0;
   const mode: TextMode = content.textMode ?? 'dark';
   const p = palette(mode);
+  const isLandscape = orientation === 'landscape';
 
-  const tight = totalRows > 10;
-  const medium = totalRows > 6 && totalRows <= 10;
+  // In landscape, weekend and weekday columns sit side-by-side, so each
+  // column carries about half the rows. Use the larger-side count for
+  // density (the longer column wins).
+  const densityRows = isLandscape
+    ? Math.max(weekendRows.length, weekdayRows.length)
+    : totalRows;
+  const tight = densityRows > 10;
+  const medium = densityRows > 6 && densityRows <= 10;
   const timeSize = tight ? 40 : medium ? 44 : 48;
   const intentionSize = tight ? 28 : medium ? 30 : 32;
 
@@ -131,11 +139,11 @@ export function MassSchedule({ content, bgImageUrl }: MassScheduleProps) {
 
       <div
         className="relative z-10 flex flex-col h-full"
-        style={{ padding: '120px 80px' }}
+        style={{ padding: isLandscape ? '60px 120px' : '120px 80px' }}
       >
         <h2
           className={`font-serif mb-3 leading-[1.05] ${p.primary}`}
-          style={{ fontSize: 80, letterSpacing: '-0.015em' }}
+          style={{ fontSize: isLandscape ? 64 : 80, letterSpacing: '-0.015em' }}
         >
           <LineMask text="Mass Intentions" delay={0} duration={1000} />
         </h2>
@@ -150,80 +158,142 @@ export function MassSchedule({ content, bgImageUrl }: MassScheduleProps) {
           <div className="w-40" />
         </motion.div>
 
-        <div
-          className="grid gap-x-10 gap-y-5 flex-1 min-h-0"
-          style={{ gridTemplateColumns: 'max-content 1fr' }}
-        >
-          {weekendRows.length > 0 && (
-            <>
-              <SectionTitle
-                text={weekendLabel?.trim() ? weekendLabel : "This Weekend's Masses"}
-                delay={titleDelay}
-                accentClass={p.accent}
-              />
-              {weekendRows.map((row, i) => (
-                <MassRow
-                  key={`w-${i}`}
-                  row={row}
-                  delay={titleDelay + 250 + i * rowGap}
-                  timeSize={timeSize}
-                  intentionSize={intentionSize}
-                  timeClass={p.accent}
-                  intentionClass={p.primary}
+        {isLandscape ? (
+          // Landscape: weekend column on the left, weekday column on the
+          // right. Each column is its own time/intention grid. Both
+          // sections appear simultaneously (rather than sequentially as in
+          // portrait) so the slide reads as one image.
+          <div
+            className="grid gap-x-24 flex-1 min-h-0"
+            style={{
+              gridTemplateColumns:
+                weekendRows.length > 0 && weekdayRows.length > 0 ? '1fr 1fr' : '1fr',
+            }}
+          >
+            {weekendRows.length > 0 && (
+              <div
+                className="grid gap-x-8 gap-y-5 h-full content-start"
+                style={{ gridTemplateColumns: 'max-content 1fr' }}
+              >
+                <SectionTitle
+                  text={weekendLabel?.trim() ? weekendLabel : "This Weekend's Masses"}
+                  delay={titleDelay}
+                  accentClass={p.accent}
                 />
-              ))}
-            </>
-          )}
-
-          {hasBoth && (
-            <motion.div
-              className={`col-span-2 h-px my-2 ${
-                mode === 'light' ? 'bg-cream/30' : 'bg-navy-100'
-              }`}
-              style={{ originX: 0 }}
-              initial={{ scaleX: 0, opacity: 0 }}
-              animate={{ scaleX: 1, opacity: 0.7 }}
-              transition={{
-                duration: 0.9,
-                delay: (titleDelay + 250 + weekendRows.length * rowGap + 100) / 1000,
-                ease: EASING,
-              }}
-            />
-          )}
-
-          {weekdayRows.length > 0 && (
-            <>
-              <SectionTitle
-                text="Daily Mass Intentions"
-                delay={
-                  titleDelay +
-                  (weekendRows.length > 0
-                    ? 250 + weekendRows.length * rowGap + sectionGap
-                    : 0)
-                }
-                accentClass={p.accent}
-              />
-              {weekdayRows.map((row, i) => {
-                const base =
-                  titleDelay +
-                  (weekendRows.length > 0
-                    ? 250 + weekendRows.length * rowGap + sectionGap + 250
-                    : 250);
-                return (
+                {weekendRows.map((row, i) => (
                   <MassRow
-                    key={`d-${i}`}
+                    key={`w-${i}`}
                     row={row}
-                    delay={base + i * rowGap}
+                    delay={titleDelay + 250 + i * rowGap}
                     timeSize={timeSize}
                     intentionSize={intentionSize}
                     timeClass={p.accent}
                     intentionClass={p.primary}
                   />
-                );
-              })}
-            </>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+
+            {weekdayRows.length > 0 && (
+              <div
+                className="grid gap-x-8 gap-y-5 h-full content-start"
+                style={{ gridTemplateColumns: 'max-content 1fr' }}
+              >
+                <SectionTitle
+                  text="Daily Mass Intentions"
+                  delay={titleDelay}
+                  accentClass={p.accent}
+                />
+                {weekdayRows.map((row, i) => (
+                  <MassRow
+                    key={`d-${i}`}
+                    row={row}
+                    delay={titleDelay + 250 + i * rowGap}
+                    timeSize={timeSize}
+                    intentionSize={intentionSize}
+                    timeClass={p.accent}
+                    intentionClass={p.primary}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div
+            className="grid gap-x-10 gap-y-5 flex-1 min-h-0"
+            style={{ gridTemplateColumns: 'max-content 1fr' }}
+          >
+            {weekendRows.length > 0 && (
+              <>
+                <SectionTitle
+                  text={weekendLabel?.trim() ? weekendLabel : "This Weekend's Masses"}
+                  delay={titleDelay}
+                  accentClass={p.accent}
+                />
+                {weekendRows.map((row, i) => (
+                  <MassRow
+                    key={`w-${i}`}
+                    row={row}
+                    delay={titleDelay + 250 + i * rowGap}
+                    timeSize={timeSize}
+                    intentionSize={intentionSize}
+                    timeClass={p.accent}
+                    intentionClass={p.primary}
+                  />
+                ))}
+              </>
+            )}
+
+            {hasBoth && (
+              <motion.div
+                className={`col-span-2 h-px my-2 ${
+                  mode === 'light' ? 'bg-cream/30' : 'bg-navy-100'
+                }`}
+                style={{ originX: 0 }}
+                initial={{ scaleX: 0, opacity: 0 }}
+                animate={{ scaleX: 1, opacity: 0.7 }}
+                transition={{
+                  duration: 0.9,
+                  delay: (titleDelay + 250 + weekendRows.length * rowGap + 100) / 1000,
+                  ease: EASING,
+                }}
+              />
+            )}
+
+            {weekdayRows.length > 0 && (
+              <>
+                <SectionTitle
+                  text="Daily Mass Intentions"
+                  delay={
+                    titleDelay +
+                    (weekendRows.length > 0
+                      ? 250 + weekendRows.length * rowGap + sectionGap
+                      : 0)
+                  }
+                  accentClass={p.accent}
+                />
+                {weekdayRows.map((row, i) => {
+                  const base =
+                    titleDelay +
+                    (weekendRows.length > 0
+                      ? 250 + weekendRows.length * rowGap + sectionGap + 250
+                      : 250);
+                  return (
+                    <MassRow
+                      key={`d-${i}`}
+                      row={row}
+                      delay={base + i * rowGap}
+                      timeSize={timeSize}
+                      intentionSize={intentionSize}
+                      timeClass={p.accent}
+                      intentionClass={p.primary}
+                    />
+                  );
+                })}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

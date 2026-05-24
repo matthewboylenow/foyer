@@ -20,20 +20,29 @@ export default async function EditSlidePage({
   const displays = tenant ? await getDisplaysByTenant(tenant.id) : [];
   const collections = tenant ? await getCollectionsByTenant(tenant.id) : [];
 
-  const content = slide.content as Record<string, unknown>;
-  const ids: Record<string, string | null> = {
-    logo: typeof content?.logoMediaId === 'string' ? content.logoMediaId : null,
-    bg: typeof content?.bgImageMediaId === 'string' ? content.bgImageMediaId : null,
-    bgVideo: typeof content?.bgVideoMediaId === 'string' ? content.bgVideoMediaId : null,
-    phone: typeof content?.phoneMockupMediaId === 'string' ? content.phoneMockupMediaId : null,
-  };
-
-  const resolved: Record<string, string | null> = { logo: null, bg: null, bgVideo: null, phone: null };
-  for (const [k, mid] of Object.entries(ids)) {
-    if (!mid) continue;
-    const m = await getMediaById(mid);
-    if (m) resolved[k] = m.blobUrl;
+  async function resolveContentMedia(content: unknown) {
+    const c = (content ?? {}) as Record<string, unknown>;
+    const ids: Record<'logo' | 'bg' | 'bgVideo' | 'phone', string | null> = {
+      logo: typeof c.logoMediaId === 'string' ? c.logoMediaId : null,
+      bg: typeof c.bgImageMediaId === 'string' ? c.bgImageMediaId : null,
+      bgVideo: typeof c.bgVideoMediaId === 'string' ? c.bgVideoMediaId : null,
+      phone: typeof c.phoneMockupMediaId === 'string' ? c.phoneMockupMediaId : null,
+    };
+    const out: { logoUrl: string | null; bgImageUrl: string | null; bgVideoUrl: string | null; phoneMockupUrl: string | null } = {
+      logoUrl: null,
+      bgImageUrl: null,
+      bgVideoUrl: null,
+      phoneMockupUrl: null,
+    };
+    if (ids.logo) out.logoUrl = (await getMediaById(ids.logo))?.blobUrl ?? null;
+    if (ids.bg) out.bgImageUrl = (await getMediaById(ids.bg))?.blobUrl ?? null;
+    if (ids.bgVideo) out.bgVideoUrl = (await getMediaById(ids.bgVideo))?.blobUrl ?? null;
+    if (ids.phone) out.phoneMockupUrl = (await getMediaById(ids.phone))?.blobUrl ?? null;
+    return out;
   }
+
+  const portraitMedia = await resolveContentMedia(slide.content);
+  const landscapeMedia = await resolveContentMedia(slide.contentLandscape);
 
   return (
     <SlideEditor
@@ -42,12 +51,7 @@ export default async function EditSlidePage({
       tenantLogoUrl={tenantLogoUrl}
       displays={displays.map((d) => ({ id: d.id, name: d.name }))}
       collections={collections}
-      initialMedia={{
-        logoUrl: resolved.logo,
-        bgImageUrl: resolved.bg,
-        bgVideoUrl: resolved.bgVideo,
-        phoneMockupUrl: resolved.phone,
-      }}
+      initialMedia={{ portrait: portraitMedia, landscape: landscapeMedia }}
     />
   );
 }

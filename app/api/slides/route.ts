@@ -25,6 +25,7 @@ export async function POST(req: Request) {
     title,
     templateType,
     content,
+    contentLandscape,
     scheduleType,
     startAt,
     endAt,
@@ -35,13 +36,30 @@ export async function POST(req: Request) {
     targetDisplays,
   } = body;
 
+  // A slide must be authored in at least one orientation. Either content is
+  // a populated object, or contentLandscape is. Empty {} = unauthored for
+  // that side.
+  const portraitAuthored =
+    content && typeof content === 'object' && Object.keys(content).length > 0;
+  const landscapeAuthored =
+    contentLandscape &&
+    typeof contentLandscape === 'object' &&
+    Object.keys(contentLandscape).length > 0;
+  if (!portraitAuthored && !landscapeAuthored) {
+    return Response.json(
+      { error: 'Slide must have content for at least one orientation' },
+      { status: 400 },
+    );
+  }
+
   const [created] = await db
     .insert(slides)
     .values({
       tenantId: tenant.id,
       title,
       templateType,
-      content: content ?? {},
+      content: portraitAuthored ? content : {},
+      contentLandscape: landscapeAuthored ? contentLandscape : null,
       scheduleType: scheduleType ?? 'evergreen',
       startAt: startAt ? new Date(startAt) : null,
       endAt: endAt ? new Date(endAt) : null,

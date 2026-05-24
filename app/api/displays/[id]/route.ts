@@ -18,6 +18,9 @@ export async function PATCH(
   if ('name' in body) update.name = body.name;
   if ('location' in body) update.location = body.location;
   if ('active' in body) update.active = body.active;
+  if ('orientation' in body) {
+    update.orientation = body.orientation === 'landscape' ? 'landscape' : 'portrait';
+  }
 
   const [updated] = await db.update(displays).set(update).where(eq(displays.id, id)).returning();
   if (!updated) return Response.json({ error: 'Not found' }, { status: 404 });

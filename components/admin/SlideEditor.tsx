@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useHotkey } from '@/lib/useHotkey';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { RectangleVertical, RectangleHorizontal, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,8 +25,15 @@ import { resolveLogoPercent } from '@/components/templates/sizing';
 import { templates } from '@/components/templates';
 import type { TemplateKey } from '@/components/templates';
 import { CollectionPicker } from './CollectionPicker';
-import type { SlideWithContent, SlideContent, MassScheduleRow, SizePreset, TextMode, Collection } from '@/lib/db/schema';
+import type { SlideWithContent, SlideContent, MassScheduleRow, SizePreset, TextMode, Collection, SlideOrientation } from '@/lib/db/schema';
 import type { TimeValue } from '@/lib/time';
+
+type OrientationMedia = {
+  logoUrl?: string | null;
+  bgImageUrl?: string | null;
+  bgVideoUrl?: string | null;
+  phoneMockupUrl?: string | null;
+};
 
 interface SlideEditorProps {
   templateType: TemplateKey;
@@ -34,11 +42,13 @@ interface SlideEditorProps {
   displays?: { id: string; name: string }[];
   collections?: Collection[];
   initialMedia?: {
-    logoUrl?: string | null;
-    bgImageUrl?: string | null;
-    bgVideoUrl?: string | null;
-    phoneMockupUrl?: string | null;
+    portrait?: OrientationMedia;
+    landscape?: OrientationMedia;
   };
+}
+
+function isContentEmpty(c: unknown): boolean {
+  return !c || typeof c !== 'object' || Object.keys(c as Record<string, unknown>).length === 0;
 }
 
 function defaultContent(templateType: TemplateKey): SlideContent {
@@ -76,9 +86,34 @@ export function SlideEditor({
   const [collectionId, setCollectionId] = useState<string | null>(
     initialSlide?.collectionId ?? null,
   );
-  const [content, setContent] = useState<SlideContent>(
-    (initialSlide?.content as SlideContent) ?? defaultContent(templateType),
+
+  // Per-orientation content. New slides start with template defaults in the
+  // portrait slot and an empty landscape slot. Existing slides pick up
+  // their authored content; empty content slots fall back to defaults so
+  // the editor never starts with literally blank fields.
+  const initialPortraitContent: SlideContent = !isContentEmpty(initialSlide?.content)
+    ? (initialSlide!.content as SlideContent)
+    : defaultContent(templateType);
+  const initialPortraitHas = isNew ? true : !isContentEmpty(initialSlide?.content);
+  const initialLandscapeHas = !isContentEmpty(initialSlide?.contentLandscape);
+
+  // We store the most recent edits per orientation even when the user
+  // "removes" that orientation — flipping the `has` flag back on restores
+  // the previous content without losing keystrokes. The persisted content
+  // sent on save is only the orientations whose `has` flag is true.
+  const [portraitContent, setPortraitContent] = useState<SlideContent>(initialPortraitContent);
+  const [landscapeContent, setLandscapeContent] = useState<SlideContent>(
+    !isContentEmpty(initialSlide?.contentLandscape)
+      ? (initialSlide!.contentLandscape as SlideContent)
+      : defaultContent(templateType),
   );
+  const [portraitHas, setPortraitHas] = useState(initialPortraitHas);
+  const [landscapeHas, setLandscapeHas] = useState(initialLandscapeHas);
+  // Active tab. Default to portrait if it has content; otherwise landscape.
+  const [activeOrientation, setActiveOrientation] = useState<SlideOrientation>(
+    initialPortraitHas ? 'portrait' : initialLandscapeHas ? 'landscape' : 'portrait',
+  );
+
   const [scheduleType, setScheduleType] = useState<'evergreen' | 'dated'>(
     initialSlide?.scheduleType ?? 'evergreen',
   );
@@ -100,11 +135,35 @@ export function SlideEditor({
   );
   const [saving, setSaving] = useState(false);
   const [savedState, setSavedState] = useState<'idle' | 'saved' | 'error'>('idle');
-  // Track resolved media URLs for live preview (not persisted — looked up server-side from IDs)
-  const [bgImageUrl, setBgImageUrl] = useState<string | null>(initialMedia?.bgImageUrl ?? null);
-  const [bgVideoUrl, setBgVideoUrl] = useState<string | null>(initialMedia?.bgVideoUrl ?? null);
-  const [phoneMockupUrl, setPhoneMockupUrl] = useState<string | null>(initialMedia?.phoneMockupUrl ?? null);
-  const [slideLogoUrl, setSlideLogoUrl] = useState<string | null>(initialMedia?.logoUrl ?? null);
+  // Track resolved media URLs for live preview, per orientation. Not
+  // persisted — looked up server-side from IDs stored inside the content
+  // jsonb. Each orientation has its own media slots so the user can pick
+  // (e.g.) a portrait bg image and a different landscape bg image.
+  const [portraitMedia, setPortraitMedia] = useState<OrientationMedia>({
+    logoUrl: initialMedia?.portrait?.logoUrl ?? null,
+    bgImageUrl: initialMedia?.portrait?.bgImageUrl ?? null,
+    bgVideoUrl: initialMedia?.portrait?.bgVideoUrl ?? null,
+    phoneMockupUrl: initialMedia?.portrait?.phoneMockupUrl ?? null,
+  });
+  const [landscapeMedia, setLandscapeMedia] = useState<OrientationMedia>({
+    logoUrl: initialMedia?.landscape?.logoUrl ?? null,
+    bgImageUrl: initialMedia?.landscape?.bgImageUrl ?? null,
+    bgVideoUrl: initialMedia?.landscape?.bgVideoUrl ?? null,
+    phoneMockupUrl: initialMedia?.landscape?.phoneMockupUrl ?? null,
+  });
+
+  // Active-tab proxies — let the form below read/write a single content
+  // blob without caring which orientation is in front.
+  const activeContent = activeOrientation === 'portrait' ? portraitContent : landscapeContent;
+  const setActiveContent = (c: SlideContent) => {
+    if (activeOrientation === 'portrait') setPortraitContent(c);
+    else setLandscapeContent(c);
+  };
+  const activeMedia = activeOrientation === 'portrait' ? portraitMedia : landscapeMedia;
+  const updateActiveMedia = (patch: Partial<OrientationMedia>) => {
+    if (activeOrientation === 'portrait') setPortraitMedia((m) => ({ ...m, ...patch }));
+    else setLandscapeMedia((m) => ({ ...m, ...patch }));
+  };
 
   const templateConfig = templates[templateType];
 
@@ -112,7 +171,8 @@ export function SlideEditor({
     const body: Record<string, unknown> = {
       title,
       templateType,
-      content,
+      content: portraitHas ? portraitContent : {},
+      contentLandscape: landscapeHas ? landscapeContent : null,
       scheduleType,
       active,
       weight: parseFloat(weight) || 1,
@@ -147,6 +207,10 @@ export function SlideEditor({
   async function handleSave() {
     if (!title.trim()) {
       toast.error('Title is required');
+      return;
+    }
+    if (!portraitHas && !landscapeHas) {
+      toast.error('Add at least one orientation (vertical or horizontal)');
       return;
     }
     setSaving(true);
@@ -190,11 +254,6 @@ export function SlideEditor({
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const updateContent = useCallback((key: string, value: unknown) => {
-    setContent((prev) => ({ ...prev, [key]: value } as SlideContent));
-  }, []);
-
   // ⌘S / Ctrl+S to save from anywhere in the editor (including fields).
   useHotkey('mod+s', (e) => {
     e.preventDefault();
@@ -236,33 +295,109 @@ export function SlideEditor({
             />
           </div>
 
-          <Separator />
-
-          {/* Template-specific fields */}
-          <TemplateFields
-            templateType={templateType}
-            content={content}
-            onChange={(c) => setContent(c)}
-            bgImageUrl={bgImageUrl}
-            onBgImageChange={setBgImageUrl}
-            bgVideoUrl={bgVideoUrl}
-            onBgVideoChange={setBgVideoUrl}
-            phoneMockupUrl={phoneMockupUrl}
-            onPhoneMockupChange={setPhoneMockupUrl}
-            slideLogoUrl={slideLogoUrl}
-            onSlideLogoChange={setSlideLogoUrl}
+          {/* Orientation tabs — switch which orientation's content the form edits. */}
+          <OrientationTabs
+            active={activeOrientation}
+            onChange={setActiveOrientation}
+            portraitHas={portraitHas}
+            landscapeHas={landscapeHas}
+            onAddPortrait={() => {
+              setPortraitContent((c) => (isContentEmpty(c) ? defaultContent(templateType) : c));
+              setPortraitHas(true);
+              setActiveOrientation('portrait');
+            }}
+            onAddLandscape={() => {
+              setLandscapeContent((c) => (isContentEmpty(c) ? defaultContent(templateType) : c));
+              setLandscapeHas(true);
+              setActiveOrientation('landscape');
+            }}
+            onRemovePortrait={() => {
+              if (!landscapeHas) {
+                toast.error('Add a horizontal version first');
+                return;
+              }
+              setPortraitHas(false);
+              setActiveOrientation('landscape');
+            }}
+            onRemoveLandscape={() => {
+              if (!portraitHas) {
+                toast.error('Add a vertical version first');
+                return;
+              }
+              setLandscapeHas(false);
+              setActiveOrientation('portrait');
+            }}
+            onCopyToPortrait={() => {
+              setPortraitContent(landscapeContent);
+              setPortraitMedia(landscapeMedia);
+              setPortraitHas(true);
+              setActiveOrientation('portrait');
+            }}
+            onCopyToLandscape={() => {
+              setLandscapeContent(portraitContent);
+              setLandscapeMedia(portraitMedia);
+              setLandscapeHas(true);
+              setActiveOrientation('landscape');
+            }}
           />
+
+          {/* Template-specific fields — bound to the active orientation. */}
+          {(activeOrientation === 'portrait' ? portraitHas : landscapeHas) ? (
+            <TemplateFields
+              templateType={templateType}
+              content={activeContent}
+              onChange={setActiveContent}
+              bgImageUrl={activeMedia.bgImageUrl ?? null}
+              onBgImageChange={(url) => updateActiveMedia({ bgImageUrl: url })}
+              bgVideoUrl={activeMedia.bgVideoUrl ?? null}
+              onBgVideoChange={(url) => updateActiveMedia({ bgVideoUrl: url })}
+              phoneMockupUrl={activeMedia.phoneMockupUrl ?? null}
+              onPhoneMockupChange={(url) => updateActiveMedia({ phoneMockupUrl: url })}
+              slideLogoUrl={activeMedia.logoUrl ?? null}
+              onSlideLogoChange={(url) => updateActiveMedia({ logoUrl: url })}
+            />
+          ) : (
+            <EmptyOrientationCallout
+              orientation={activeOrientation}
+              otherAuthored={activeOrientation === 'portrait' ? landscapeHas : portraitHas}
+              onStartBlank={() => {
+                if (activeOrientation === 'portrait') {
+                  setPortraitContent(defaultContent(templateType));
+                  setPortraitHas(true);
+                } else {
+                  setLandscapeContent(defaultContent(templateType));
+                  setLandscapeHas(true);
+                }
+              }}
+              onCopyFromOther={() => {
+                if (activeOrientation === 'portrait') {
+                  setPortraitContent(landscapeContent);
+                  setPortraitMedia(landscapeMedia);
+                  setPortraitHas(true);
+                } else {
+                  setLandscapeContent(portraitContent);
+                  setLandscapeMedia(portraitMedia);
+                  setLandscapeHas(true);
+                }
+              }}
+            />
+          )}
         </div>
 
         {/* Right: Schedule + settings (40%) */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Live preview */}
+          {/* Live preview — shows whichever orientation is active. */}
           <div className="p-4 border border-border rounded-lg">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-medium text-sm">Preview</h3>
+              <h3 className="font-medium text-sm">
+                Preview ·{' '}
+                <span className="text-muted-foreground">
+                  {activeOrientation === 'portrait' ? 'Vertical' : 'Horizontal'}
+                </span>
+              </h3>
               {!isNew && initialSlide && (
                 <a
-                  href={`/display/__preview?slideId=${initialSlide.id}`}
+                  href={`/display/__preview?slideId=${initialSlide.id}&orientation=${activeOrientation}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs text-navy underline"
@@ -271,17 +406,24 @@ export function SlideEditor({
                 </a>
               )}
             </div>
-            <LivePreview
-              templateType={templateType}
-              content={content}
-              logoUrl={slideLogoUrl ?? tenantLogoUrl ?? null}
-              bgImageUrl={bgImageUrl}
-              bgVideoUrl={bgVideoUrl}
-              phoneMockupUrl={phoneMockupUrl}
-              width={280}
-            />
+            {(activeOrientation === 'portrait' ? portraitHas : landscapeHas) ? (
+              <LivePreview
+                templateType={templateType}
+                content={activeContent}
+                orientation={activeOrientation}
+                logoUrl={activeMedia.logoUrl ?? tenantLogoUrl ?? null}
+                bgImageUrl={activeMedia.bgImageUrl ?? null}
+                bgVideoUrl={activeMedia.bgVideoUrl ?? null}
+                phoneMockupUrl={activeMedia.phoneMockupUrl ?? null}
+                width={activeOrientation === 'portrait' ? 280 : 380}
+              />
+            ) : (
+              <div className="text-xs text-muted-foreground italic py-8 text-center border border-dashed border-border rounded-md">
+                No {activeOrientation === 'portrait' ? 'vertical' : 'horizontal'} version yet.
+              </div>
+            )}
             <p className="text-[11px] text-muted-foreground mt-2">
-              Live preview at 26% scale. Animations replay 500ms after you stop typing.
+              Live preview. Animations replay 500ms after you stop typing.
             </p>
           </div>
 
@@ -445,6 +587,140 @@ export function SlideEditor({
           )}
 
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Orientation tabs ────────────────────────────────────────────────────────
+
+interface OrientationTabsProps {
+  active: SlideOrientation;
+  onChange: (o: SlideOrientation) => void;
+  portraitHas: boolean;
+  landscapeHas: boolean;
+  onAddPortrait: () => void;
+  onAddLandscape: () => void;
+  onRemovePortrait: () => void;
+  onRemoveLandscape: () => void;
+  onCopyToPortrait: () => void;
+  onCopyToLandscape: () => void;
+}
+
+function OrientationTabs({
+  active,
+  onChange,
+  portraitHas,
+  landscapeHas,
+  onRemovePortrait,
+  onRemoveLandscape,
+}: OrientationTabsProps) {
+  function Tab({
+    orientation,
+    label,
+    icon,
+    authored,
+  }: {
+    orientation: SlideOrientation;
+    label: string;
+    icon: React.ReactNode;
+    authored: boolean;
+  }) {
+    const isActive = orientation === active;
+    return (
+      <button
+        type="button"
+        onClick={() => onChange(orientation)}
+        className={`flex items-center gap-2 px-3 py-2 border-b-2 -mb-px text-sm font-medium transition-colors ${
+          isActive
+            ? 'border-rust text-navy'
+            : 'border-transparent text-navy/55 hover:text-navy hover:border-navy/20'
+        }`}
+      >
+        {icon}
+        <span>{label}</span>
+        <span
+          className={`text-[10px] uppercase tracking-widest font-semibold px-1.5 py-0.5 rounded ${
+            authored ? 'bg-navy/10 text-navy/70' : 'bg-navy/5 text-navy/40'
+          }`}
+        >
+          {authored ? 'Authored' : 'Empty'}
+        </span>
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-end justify-between border-b border-border">
+      <div className="flex items-end gap-2">
+        <Tab
+          orientation="portrait"
+          label="Vertical"
+          icon={<RectangleVertical size={14} />}
+          authored={portraitHas}
+        />
+        <Tab
+          orientation="landscape"
+          label="Horizontal"
+          icon={<RectangleHorizontal size={14} />}
+          authored={landscapeHas}
+        />
+      </div>
+      {/* Remove action — only when the active tab is authored AND the
+          other side is too (so we never strand a slide with no orientations). */}
+      {((active === 'portrait' && portraitHas && landscapeHas) ||
+        (active === 'landscape' && landscapeHas && portraitHas)) && (
+        <button
+          type="button"
+          onClick={active === 'portrait' ? onRemovePortrait : onRemoveLandscape}
+          className="mb-1 flex items-center gap-1 text-xs text-navy/55 hover:text-rust"
+        >
+          <X size={12} />
+          Remove {active === 'portrait' ? 'vertical' : 'horizontal'} version
+        </button>
+      )}
+    </div>
+  );
+}
+
+function EmptyOrientationCallout({
+  orientation,
+  otherAuthored,
+  onStartBlank,
+  onCopyFromOther,
+}: {
+  orientation: SlideOrientation;
+  otherAuthored: boolean;
+  onStartBlank: () => void;
+  onCopyFromOther: () => void;
+}) {
+  const label = orientation === 'portrait' ? 'vertical' : 'horizontal';
+  const otherLabel = orientation === 'portrait' ? 'horizontal' : 'vertical';
+  return (
+    <div className="border border-dashed border-border rounded-lg p-6 text-center space-y-3">
+      <p className="text-sm text-navy/65">
+        This slide has no {label} version yet. It won&apos;t appear on{' '}
+        {label} screens until you add one.
+      </p>
+      <div className="flex justify-center gap-2 flex-wrap">
+        <Button
+          type="button"
+          onClick={onStartBlank}
+          className="bg-rust text-cream hover:bg-rust-700 gap-1.5"
+        >
+          <Plus size={14} />
+          Start a {label} version
+        </Button>
+        {otherAuthored && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCopyFromOther}
+            className="gap-1.5"
+          >
+            Copy from {otherLabel}
+          </Button>
+        )}
       </div>
     </div>
   );
