@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { getCurrentTenant } from '@/lib/tenant';
 import { getSettingsByTenant } from '@/lib/db/queries';
+import { getFontPair, googleFontsUrlForPair, fontStackForPair } from '@/lib/fonts';
 
 /**
  * Saint Helen brand defaults — used when a tenant hasn't set a custom
@@ -56,6 +57,12 @@ export async function TenantTheme({ children }: { children: React.ReactNode }) {
   const cream = settings?.creamColor || DEFAULTS.cream;
   const gold = settings?.goldColor || DEFAULTS.gold;
 
+  // Tenant's slide font pair — drives --font-serif / --font-sans below.
+  // Unknown / null ids fall back to the first pair in FONT_PAIRS.
+  const pair = getFontPair(settings?.fontPair);
+  const { headingStack, bodyStack } = fontStackForPair(pair);
+  const googleFontsHref = googleFontsUrlForPair(pair);
+
   // Derived navy shades — 50 (very light) through 900 (very dark).
   const style = {
     '--color-navy': navy,
@@ -71,11 +78,25 @@ export async function TenantTheme({ children }: { children: React.ReactNode }) {
     '--color-rust-700': mix(rust, '#000000', 0.22),
     '--color-cream': cream,
     '--color-gold': gold,
+    // Override the variables the root layout sets via next/font. Tailwind's
+    // font-serif / font-sans utility classes resolve to var(--font-serif)
+    // / var(--font-sans), so the whole subtree (admin previews + the
+    // player) picks up the tenant's choice automatically.
+    '--font-serif': headingStack,
+    '--font-sans': bodyStack,
   } as CSSProperties;
 
   return (
-    <div style={style} className="contents">
-      {children}
-    </div>
+    <>
+      {/* Preconnect speeds up the font fetch by ~100ms on cold loads.
+          The stylesheet itself loads the chosen family in the weights
+          slide templates use. */}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link rel="stylesheet" href={googleFontsHref} />
+      <div style={style} className="contents">
+        {children}
+      </div>
+    </>
   );
 }

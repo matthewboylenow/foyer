@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { getCurrentTenant } from '@/lib/tenant';
 import { getSlideById, getSettingsWithMedia, getMediaById } from '@/lib/db/queries';
 import { templates } from '@/components/templates';
+import { TenantTheme } from '@/components/TenantTheme';
 import type { SlideWithContent } from '@/lib/db/schema';
 
 // Preview must always reflect the latest saved slide — no CDN caching.
@@ -87,15 +88,17 @@ export default async function PreviewPage({
   const SlideComponent = templateConfig.component as React.ComponentType<any>;
 
   return (
-    <div className="fixed inset-0 bg-black overflow-hidden">
-      <SlideComponent
-        content={effectiveContent as SlideWithContent['content']}
-        orientation={orientation}
-        logoUrl={logoUrl ?? undefined}
-        bgImageUrl={bgImageUrl ?? undefined}
-        bgVideoUrl={bgVideoUrl ?? undefined}
-        phoneMockupUrl={phoneMockupUrl ?? undefined}
-      />
-    </div>
+    <TenantTheme>
+      <div className="fixed inset-0 bg-black overflow-hidden">
+        <SlideComponent
+          content={effectiveContent as SlideWithContent['content']}
+          orientation={orientation}
+          logoUrl={logoUrl ?? undefined}
+          bgImageUrl={bgImageUrl ?? undefined}
+          bgVideoUrl={bgVideoUrl ?? undefined}
+          phoneMockupUrl={phoneMockupUrl ?? undefined}
+        />
+      </div>
+    </TenantTheme>
   );
 }

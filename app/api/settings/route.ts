@@ -3,6 +3,7 @@ import { db } from '@/lib/db/client';
 import { settings } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
 import { getCurrentTenant } from '@/lib/tenant';
+import { FONT_PAIRS } from '@/lib/fonts';
 export async function PATCH(req: Request) {
   const session = await auth();
   if (!session && process.env.AUTH_DEV_BYPASS !== '1') {
@@ -27,6 +28,13 @@ export async function PATCH(req: Request) {
   // Per-tenant email "from" name + address.
   if ('emailFromName' in body) update.emailFromName = body.emailFromName;
   if ('emailFromAddress' in body) update.emailFromAddress = body.emailFromAddress;
+  // Per-tenant slide font pair. Validate against the curated list so an
+  // attacker can't smuggle a third-party CSS URL into the picker.
+  if ('fontPair' in body && typeof body.fontPair === 'string') {
+    if (FONT_PAIRS.some((p) => p.id === body.fontPair)) {
+      update.fontPair = body.fontPair;
+    }
+  }
 
   const [updated] = await db
     .update(settings)

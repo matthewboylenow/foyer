@@ -83,6 +83,10 @@ export const settings = pgTable('settings', {
   accentColor: text('accent_color').default('#CD5334').notNull(),
   creamColor: text('cream_color').default('#FAF9F7').notNull(),
   goldColor: text('gold_color').default('#D4AF37').notNull(),
+  /** Slide-output font pair id, looked up in lib/fonts.ts FONT_PAIRS.
+   *  Drives --font-serif / --font-sans CSS variables via TenantTheme.
+   *  Stored as text (not enum) so adding pairs doesn't need a migration. */
+  fontPair: text('font_pair').default('classic-sans').notNull(),
   /** Per-tenant Resend "from" address. When null we fall back to EMAIL_FROM env. */
   emailFromName: text('email_from_name'),
   emailFromAddress: text('email_from_address'),

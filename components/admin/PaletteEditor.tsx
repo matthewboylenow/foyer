@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, type CSSProperties } from 'react';
+import { useState, useMemo, type CSSProperties } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { paletteContrastChecks, MIN_CONTRAST_RATIO } from '@/lib/contrast';
 
 const DEFAULTS = {
   primaryColor: '#1F346D',
@@ -68,6 +70,12 @@ export function PaletteEditor({ initial }: Props) {
     '--preview-gold': values.goldColor,
   } as CSSProperties;
 
+  // Recompute contrast checks on every render so the warning banner
+  // updates live as the user nudges a color picker.
+  const checks = useMemo(() => paletteContrastChecks(values), [values]);
+  const failing = checks.filter((c) => c.verdict === 'fail');
+  const borderline = checks.filter((c) => c.verdict === 'borderline');
+
   return (
     <div className="space-y-5">
       <div className="space-y-3">
@@ -95,6 +103,12 @@ export function PaletteEditor({ initial }: Props) {
           </div>
         ))}
       </div>
+
+      {/* Contrast warnings. We only render a banner when something fails
+          or is borderline — a clean palette gets no chrome. */}
+      {(failing.length > 0 || borderline.length > 0) && (
+        <ContrastWarnings failing={failing} borderline={borderline} />
+      )}
 
       {/* Live preview strip */}
       <div
@@ -138,6 +152,57 @@ export function PaletteEditor({ initial }: Props) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface ContrastWarningsProps {
+  failing: ReturnType<typeof paletteContrastChecks>;
+  borderline: ReturnType<typeof paletteContrastChecks>;
+}
+
+/**
+ * Renders the WCAG warning banner under the palette swatches. Failing
+ * pairings get an amber alert tone; borderline ones get a softer "watch
+ * this" note. Good pairings produce no chrome at all — quiet by default.
+ */
+function ContrastWarnings({ failing, borderline }: ContrastWarningsProps) {
+  return (
+    <div
+      className={`rounded-lg border px-4 py-3 space-y-2 ${
+        failing.length > 0
+          ? 'border-amber-300 bg-amber-50/60'
+          : 'border-navy/15 bg-navy/[0.03]'
+      }`}
+    >
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <AlertTriangle
+          size={15}
+          className={failing.length > 0 ? 'text-amber-700' : 'text-navy/55'}
+        />
+        <span className={failing.length > 0 ? 'text-amber-900' : 'text-navy/70'}>
+          {failing.length > 0
+            ? 'Some color pairs may be hard to read from across the room'
+            : 'A couple of pairs are close to the legibility floor'}
+        </span>
+      </div>
+      <ul className="text-xs space-y-1.5 pl-6">
+        {failing.map((c) => (
+          <li key={c.label} className="text-amber-900">
+            <span className="font-medium">{c.label}</span> ·{' '}
+            <span className="font-mono">{c.ratio?.toFixed(2)}:1</span> (needs ≥{' '}
+            {MIN_CONTRAST_RATIO.toFixed(1)}:1)
+            <span className="block text-amber-900/70 mt-0.5">{c.where}</span>
+          </li>
+        ))}
+        {borderline.map((c) => (
+          <li key={c.label} className="text-navy/70">
+            <span className="font-medium">{c.label}</span> ·{' '}
+            <span className="font-mono">{c.ratio?.toFixed(2)}:1</span> (close to the
+            {' '}floor — fine on phones, borderline on a TV across a lobby)
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

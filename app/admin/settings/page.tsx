@@ -4,6 +4,7 @@ import { getSettingsWithMedia } from '@/lib/db/queries';
 import { SettingsForm } from '@/components/admin/SettingsForm';
 import { LogoSection } from '@/components/admin/LogoSection';
 import { PaletteEditor } from '@/components/admin/PaletteEditor';
+import { FontPairPicker } from '@/components/admin/FontPairPicker';
 import { EmailFromEditor } from '@/components/admin/EmailFromEditor';
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/lib/auth/config';
@@ -58,6 +59,19 @@ export default async function SettingsPage() {
               goldColor: settings?.goldColor ?? '#D4AF37',
             }}
           />
+        </section>
+
+        {/* Fonts */}
+        <section className="rounded-xl border border-navy/10 bg-cream p-6 space-y-5">
+          <div>
+            <h2 className="font-serif text-lg font-semibold text-navy">Slide fonts</h2>
+            <p className="text-sm text-navy/55 mt-1">
+              The typeface pair the templates use. Pick one that feels right for your
+              parish — the admin still uses these too. We&apos;re working on splitting the
+              admin chrome onto its own brand font in a coming update.
+            </p>
+          </div>
+          <FontPairPicker initial={settings?.fontPair ?? 'classic-sans'} />
         </section>
 
         {/* Email sender */}
