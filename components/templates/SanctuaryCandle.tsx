@@ -172,17 +172,19 @@ export function SanctuaryCandle({ content, orientation = 'portrait', bgImageUrl 
           </svg>
         </motion.div>
 
-        {/* Caption */}
-        <BlurIn delay={1200} duration={1100} y={8} blur={6} className="mb-6">
+        {/* Caption — bumped from 22px and opacity 0.9/0.7 because at TV
+            viewing distance the gold-on-dark pair was below comfortable
+            contrast (the 0.7 line was effectively ~4:1, just under AA). */}
+        <BlurIn delay={1200} duration={1100} y={8} blur={6} className="mb-8">
           <p
-            className="font-sans text-gold uppercase tracking-widest"
-            style={{ fontSize: 22, opacity: 0.9 }}
+            className="font-sans text-gold uppercase tracking-[0.2em]"
+            style={{ fontSize: 32 }}
           >
             Our Sanctuary Candle Burns This Week
           </p>
           <p
-            className="font-sans text-gold uppercase tracking-widest mt-2"
-            style={{ fontSize: 22, opacity: 0.7 }}
+            className="font-sans text-gold uppercase tracking-widest mt-3"
+            style={{ fontSize: 28, opacity: 0.92 }}
           >
             {captionLine}
           </p>

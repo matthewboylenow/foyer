@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SlideFrame } from './SlideFrame';
 import { SlideErrorBoundary } from './SlideErrorBoundary';
+import { BgVideoStack } from './BgVideoStack';
 import { buildShuffledPool, slidesHaveChanged } from './shuffle';
 import { templates } from '@/components/templates';
 import { reportError } from '@/lib/reportError';
@@ -229,15 +230,18 @@ export function Player({ displayId }: PlayerProps) {
 
     // Warm the HTTP cache for the next slide's background video so the
     // <video> element doesn't sit on a black/gradient fallback for several
-    // seconds while it downloads 8+ MB. We use fetch() instead of a hidden
-    // <video preload=auto> because Tizen/OptiSigns is unreliable about
-    // honoring preload on detached video elements, but does cache plain
-    // GET responses. AbortController lets us cancel if the slide rotates
-    // before the fetch completes.
+    // seconds while it downloads. We send a `Range: bytes=0-` header
+    // because <video> elements issue range requests for playback — a plain
+    // GET cache entry from `force-cache` wouldn't satisfy the byte-range
+    // lookup, so the video would re-download anyway.
     const videoUrl = next?.resolvedMedia?.bgVideoUrl;
     if (!videoUrl) return;
     const ctrl = new AbortController();
-    fetch(videoUrl, { signal: ctrl.signal, cache: 'force-cache' }).catch(() => {
+    fetch(videoUrl, {
+      signal: ctrl.signal,
+      cache: 'force-cache',
+      headers: { Range: 'bytes=0-' },
+    }).catch(() => {
       /* network blip or aborted — playback fetch will retry */
     });
     return () => ctrl.abort();
@@ -358,6 +362,19 @@ export function Player({ displayId }: PlayerProps) {
     });
   }, [bannedIds]);
 
+  // Unique bg-video URLs across the pool — passed to BgVideoStack so each
+  // is mounted exactly once and persists across slide rotations. Without
+  // this, every cycle remounted a fresh <video> and Blob re-streamed the
+  // file.
+  const poolVideoUrls = useMemo(() => {
+    const urls = new Set<string>();
+    for (const s of pool) {
+      const u = s.resolvedMedia?.bgVideoUrl;
+      if (u) urls.add(u);
+    }
+    return [...urls];
+  }, [pool]);
+
   if (!ready || pool.length === 0) {
     return <div className="w-full h-full bg-navy-900" />;
   }
@@ -375,9 +392,11 @@ export function Player({ displayId }: PlayerProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const SlideComponent = templateConfig.component as React.ComponentType<any>;
   const resolved = current.resolvedMedia ?? {};
+  const currentVideoUrl = resolved.bgVideoUrl ?? null;
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full bg-navy-900">
+      <BgVideoStack urls={poolVideoUrls} activeUrl={currentVideoUrl} />
       <SlideFrame
         slideId={`${current.id}-${currentIndex}`}
         holdMs={holdMs}
@@ -395,6 +414,7 @@ export function Player({ displayId }: PlayerProps) {
             logoUrl={resolved.logoUrl}
             bgImageUrl={resolved.bgImageUrl}
             bgVideoUrl={resolved.bgVideoUrl}
+            bgVideoExternal
             phoneMockupUrl={resolved.phoneMockupUrl}
           />
         </SlideErrorBoundary>

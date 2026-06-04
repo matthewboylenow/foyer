@@ -22,7 +22,7 @@ export function VideoUpload({
   currentUrl,
   onUploaded,
   onCleared,
-  maxSizeMB = 100,
+  maxSizeMB = 15,
 }: VideoUploadProps) {
   const [progress, setProgress] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -76,12 +76,16 @@ export function VideoUpload({
         <UploadProgress percent={progress ?? 0} label="Uploading video…" />
       ) : currentUrl ? (
         <div className="flex items-start gap-3">
+          {/* preload=metadata + no autoPlay: avoid streaming the full file
+              every time an admin opens the editor — was a major source of
+              Blob egress at the 100 MB upload cap. */}
           <video
             src={currentUrl}
-            autoPlay
             muted
             loop
             playsInline
+            controls
+            preload="metadata"
             className="border border-border rounded-md bg-muted/30 object-cover"
             style={{ width: 160, height: 90 }}
           />
@@ -118,7 +122,7 @@ export function VideoUpload({
           <Film size={24} />
           <span className="text-sm">Click to upload</span>
           <span className="text-xs text-center">
-            MP4 / WebM · 5–15s loop recommended · max {maxSizeMB} MB
+            MP4 / WebM · 5–15s loop · keep under {maxSizeMB} MB (re-encode at ~3–6 Mbps)
           </span>
         </button>
       )}

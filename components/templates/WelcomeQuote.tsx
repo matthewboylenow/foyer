@@ -69,7 +69,7 @@ export function WelcomeQuote({ content, orientation = 'portrait', bgImageUrl }: 
           <BlurIn delay={1800} duration={1100} y={6} as="p">
             <span
               className={`font-sans uppercase tracking-widest block ${p.accent}`}
-              style={{ fontSize: 22 }}
+              style={{ fontSize: 28 }}
             >
               {attribution}
             </span>

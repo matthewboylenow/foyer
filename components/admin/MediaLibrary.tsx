@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { toast } from 'sonner';
 import { Search, Trash2, ImageIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -91,12 +92,16 @@ export function MediaLibrary({ initialItems }: MediaLibraryProps) {
               key={m.id}
               className="border border-border rounded-md bg-muted/20 overflow-hidden flex flex-col"
             >
-              <div className="aspect-square flex items-center justify-center p-3 bg-muted/30">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+              <div className="relative aspect-square p-3 bg-muted/30">
+                {/* next/image downscales blob originals so the library grid
+                    doesn't stream full-res files on every page view. */}
+                <Image
                   src={m.blobUrl}
                   alt={m.filename}
-                  className="max-w-full max-h-full object-contain"
+                  fill
+                  sizes="(min-width: 1024px) 300px, (min-width: 640px) 33vw, 50vw"
+                  className="object-contain p-3"
+                  unoptimized={m.blobUrl.endsWith('.svg')}
                 />
               </div>
               <div className="p-2 border-t border-border space-y-1">

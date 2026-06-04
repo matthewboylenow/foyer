@@ -21,6 +21,10 @@ interface ParishIdentityProps {
   logoUrl?: string;
   bgImageUrl?: string;
   bgVideoUrl?: string;
+  // When true, the bg video is mounted by the Player at a layer above the
+  // SlideFrame and persists across slide rotations — this template should
+  // skip rendering its own <video> and let the parent show through.
+  bgVideoExternal?: boolean;
 }
 
 /**
@@ -48,7 +52,7 @@ function parseSublineLines(html: string): string[] {
     .filter(Boolean);
 }
 
-export function ParishIdentity({ content, orientation = 'portrait', logoUrl, bgImageUrl, bgVideoUrl }: ParishIdentityProps) {
+export function ParishIdentity({ content, orientation = 'portrait', logoUrl, bgImageUrl, bgVideoUrl, bgVideoExternal }: ParishIdentityProps) {
   const { headline, subline, logoSize, headlineSize } = content;
 
   const logoMaxWidth = resolveLogoWidth(logoSize);
@@ -58,20 +62,26 @@ export function ParishIdentity({ content, orientation = 'portrait', logoUrl, bgI
   const hasMedia = Boolean(bgVideoUrl || bgImageUrl);
   const isLandscape = orientation === 'landscape';
   const padding = isLandscape ? '60px 160px' : '120px 80px';
+  // When the Player owns the bg video (persistent layer behind the slide),
+  // this template renders a transparent root so the video shows through and
+  // skips the local <video>. The tint/overlay layers still apply on top.
+  const rootBg = bgVideoUrl && bgVideoExternal ? '' : 'bg-navy-900';
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-navy-900">
+    <div className={`relative w-full h-full overflow-hidden ${rootBg}`}>
       {/* Background media (video > image > gradient fallback) */}
       {bgVideoUrl ? (
-        <video
-          src={bgVideoUrl}
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
+        bgVideoExternal ? null : (
+          <video
+            src={bgVideoUrl}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )
       ) : bgImageUrl ? (
         <KenBurns src={bgImageUrl} duration={28000} />
       ) : (

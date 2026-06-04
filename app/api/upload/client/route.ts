@@ -5,10 +5,11 @@ import { getCurrentTenant } from '@/lib/tenant';
 const ALLOWED_IMAGE = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
 const ALLOWED_VIDEO = ['video/mp4', 'video/webm', 'video/quicktime'];
 
-// Max sizes in bytes. Video gets 100 MB because client uploads bypass the
-// 4.5 MB serverless body limit that previously capped us at 25 MB.
+// Cap videos at 15 MB to control Vercel Blob egress — a 1080p 10s loop
+// re-encoded to ~3–6 Mbps fits comfortably and looks identical at TV
+// viewing distance vs. the prior 100 MB ceiling.
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 15 * 1024 * 1024;
 
 /**
  * Client-upload helper for Vercel Blob. The browser POSTs here to request a
