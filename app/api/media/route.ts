@@ -40,6 +40,7 @@ export async function POST(req: Request) {
 
   const body = (await req.json()) as {
     blobUrl?: string;
+    posterUrl?: string | null;
     filename?: string;
     bytes?: number;
     type?: 'image' | 'logo' | 'video';
@@ -51,6 +52,10 @@ export async function POST(req: Request) {
   if (!body.blobUrl.includes('.public.blob.vercel-storage.com')) {
     return Response.json({ error: 'Bad blob URL' }, { status: 400 });
   }
+  // Poster is optional (videos only) and must live in our store like blobUrl.
+  if (body.posterUrl && !body.posterUrl.includes('.public.blob.vercel-storage.com')) {
+    return Response.json({ error: 'Bad poster URL' }, { status: 400 });
+  }
   if (body.type !== 'image' && body.type !== 'logo' && body.type !== 'video') {
     return Response.json({ error: 'Bad type' }, { status: 400 });
   }
@@ -61,6 +66,7 @@ export async function POST(req: Request) {
       tenantId: tenant.id,
       type: body.type,
       blobUrl: body.blobUrl,
+      posterUrl: body.type === 'video' ? (body.posterUrl ?? null) : null,
       filename: body.filename,
       bytes: body.bytes ?? null,
       uploadedBy: session?.user?.email ?? null,

@@ -13,6 +13,7 @@ interface LivePreviewProps {
   logoUrl?: string | null;
   bgImageUrl?: string | null;
   bgVideoUrl?: string | null;
+  bgVideoPosterUrl?: string | null;
   phoneMockupUrl?: string | null;
   /** Preview pixel width — height auto-scales to the orientation's aspect. */
   width?: number;
@@ -25,6 +26,7 @@ export function LivePreview({
   logoUrl,
   bgImageUrl,
   bgVideoUrl,
+  bgVideoPosterUrl,
   phoneMockupUrl,
   width = 280,
 }: LivePreviewProps) {
@@ -78,6 +80,7 @@ export function LivePreview({
           logoUrl={logoUrl ?? undefined}
           bgImageUrl={bgImageUrl ?? undefined}
           bgVideoUrl={bgVideoUrl ?? undefined}
+          bgVideoPosterUrl={bgVideoPosterUrl ?? undefined}
           phoneMockupUrl={phoneMockupUrl ?? undefined}
         />
       </div>

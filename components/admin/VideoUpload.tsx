@@ -7,12 +7,15 @@ import { Upload, X, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useTenantSlug } from '@/lib/tenant-client';
+import { captureVideoPoster } from '@/lib/videoPoster';
 import { UploadProgress } from './UploadProgress';
 
 interface VideoUploadProps {
   label?: string;
   currentUrl?: string | null;
-  onUploaded: (media: { id: string; blobUrl: string }) => void;
+  /** Poster frame captured at upload time — shown instead of streaming the video. */
+  currentPosterUrl?: string | null;
+  onUploaded: (media: { id: string; blobUrl: string; posterUrl: string | null }) => void;
   onCleared?: () => void;
   maxSizeMB?: number;
 }
@@ -20,6 +23,7 @@ interface VideoUploadProps {
 export function VideoUpload({
   label = 'Upload video',
   currentUrl,
+  currentPosterUrl,
   onUploaded,
   onCleared,
   maxSizeMB = 15,
@@ -44,19 +48,43 @@ export function VideoUpload({
         onUploadProgress: ({ percentage }) => setProgress(percentage),
       });
 
+      // Screen-grab a poster frame from the LOCAL file (no download) so
+      // admin previews never need to stream the video from Blob.
+      let posterUrl: string | null = null;
+      const posterBlob = await captureVideoPoster(file);
+      if (posterBlob) {
+        try {
+          const posterName = `${file.name.replace(/\.[^.]+$/, '')}.poster.webp`;
+          const posterPath = tenantSlug ? `${tenantSlug}/${posterName}` : posterName;
+          const posterResult = await upload(
+            posterPath,
+            new File([posterBlob], posterName, { type: 'image/webp' }),
+            {
+              access: 'public',
+              handleUploadUrl: '/api/upload/client',
+              clientPayload: JSON.stringify({ type: 'image' }),
+            },
+          );
+          posterUrl = posterResult.url;
+        } catch {
+          // Poster is an optimization — never fail the video upload over it.
+        }
+      }
+
       const res = await fetch('/api/media', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           blobUrl: result.url,
+          posterUrl,
           filename: file.name,
           bytes: file.size,
           type: 'video',
         }),
       });
       if (!res.ok) throw new Error(await res.text());
-      const row = (await res.json()) as { id: string; blobUrl: string };
-      onUploaded({ id: row.id, blobUrl: row.blobUrl });
+      const row = (await res.json()) as { id: string; blobUrl: string; posterUrl: string | null };
+      onUploaded({ id: row.id, blobUrl: row.blobUrl, posterUrl: row.posterUrl ?? null });
       toast.success('Video uploaded');
     } catch (err) {
       toast.error(`Upload failed: ${err instanceof Error ? err.message : 'unknown error'}`);
@@ -76,16 +104,17 @@ export function VideoUpload({
         <UploadProgress percent={progress ?? 0} label="Uploading video…" />
       ) : currentUrl ? (
         <div className="flex items-start gap-3">
-          {/* preload=metadata + no autoPlay: avoid streaming the full file
-              every time an admin opens the editor — was a major source of
-              Blob egress at the 100 MB upload cap. */}
+          {/* preload=none + poster: zero video bytes until the admin
+              actually presses play. Legacy uploads without a poster fall
+              back to preload=metadata (a few KB) so the box isn't blank. */}
           <video
             src={currentUrl}
             muted
             loop
             playsInline
             controls
-            preload="metadata"
+            preload={currentPosterUrl ? 'none' : 'metadata'}
+            poster={currentPosterUrl ?? undefined}
             className="border border-border rounded-md bg-muted/30 object-cover"
             style={{ width: 160, height: 90 }}
           />

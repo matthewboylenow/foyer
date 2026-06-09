@@ -64,6 +64,10 @@ export const media = pgTable('media', {
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
   type: mediaTypeEnum('type').notNull(),
   blobUrl: text('blob_url').notNull(),
+  // Still frame captured at upload time (videos only). Admin previews show
+  // this instead of mounting a <video>, which would stream the file from
+  // Blob storage on every page view.
+  posterUrl: text('poster_url'),
   filename: text('filename').notNull(),
   width: integer('width'),
   height: integer('height'),

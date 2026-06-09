@@ -96,6 +96,7 @@ export default async function PreviewPage({
           logoUrl={logoUrl ?? undefined}
           bgImageUrl={bgImageUrl ?? undefined}
           bgVideoUrl={bgVideoUrl ?? undefined}
+          bgVideoAutoPlay
           phoneMockupUrl={phoneMockupUrl ?? undefined}
         />
       </div>

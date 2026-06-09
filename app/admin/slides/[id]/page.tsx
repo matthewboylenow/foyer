@@ -28,15 +28,26 @@ export default async function EditSlidePage({
       bgVideo: typeof c.bgVideoMediaId === 'string' ? c.bgVideoMediaId : null,
       phone: typeof c.phoneMockupMediaId === 'string' ? c.phoneMockupMediaId : null,
     };
-    const out: { logoUrl: string | null; bgImageUrl: string | null; bgVideoUrl: string | null; phoneMockupUrl: string | null } = {
+    const out: {
+      logoUrl: string | null;
+      bgImageUrl: string | null;
+      bgVideoUrl: string | null;
+      bgVideoPosterUrl: string | null;
+      phoneMockupUrl: string | null;
+    } = {
       logoUrl: null,
       bgImageUrl: null,
       bgVideoUrl: null,
+      bgVideoPosterUrl: null,
       phoneMockupUrl: null,
     };
     if (ids.logo) out.logoUrl = (await getMediaById(ids.logo))?.blobUrl ?? null;
     if (ids.bg) out.bgImageUrl = (await getMediaById(ids.bg))?.blobUrl ?? null;
-    if (ids.bgVideo) out.bgVideoUrl = (await getMediaById(ids.bgVideo))?.blobUrl ?? null;
+    if (ids.bgVideo) {
+      const v = await getMediaById(ids.bgVideo);
+      out.bgVideoUrl = v?.blobUrl ?? null;
+      out.bgVideoPosterUrl = v?.posterUrl ?? null;
+    }
     if (ids.phone) out.phoneMockupUrl = (await getMediaById(ids.phone))?.blobUrl ?? null;
     return out;
   }

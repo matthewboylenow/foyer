@@ -173,6 +173,7 @@ export function SlideCard({
               logoUrl={resolved.logoUrl}
               bgImageUrl={resolved.bgImageUrl}
               bgVideoUrl={resolved.bgVideoUrl}
+              bgVideoPosterUrl={resolved.bgVideoPosterUrl}
               phoneMockupUrl={resolved.phoneMockupUrl}
             />
           </div>

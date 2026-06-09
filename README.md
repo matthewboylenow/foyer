@@ -54,6 +54,11 @@ they act:
    edge cache serves displays; Blob is only hit on a cache miss), the next-slide
    prewarm warms that same optimized URL — never the raw original — and bg videos are
    mounted once per page load by `BgVideoStack` instead of re-streaming per rotation.
+4. **In the admin:** videos are never streamed just to preview them. A poster frame is
+   screen-grabbed in the browser at upload time (zero download — captured from the
+   local file) and stored on the media row; slide cards, the editor preview, and
+   Now Playing all render the poster. Only the explicit "Full size ↗" preview page
+   plays the real file.
 
 Rules of thumb when authoring: background photos should land under ~1 MB after the
 automatic compression; video loops ~10s at ≤15 MB; check the media library, which

@@ -343,6 +343,7 @@ function DisplayRow({
                 logoUrl={currentSlide.resolvedMedia?.logoUrl}
                 bgImageUrl={currentSlide.resolvedMedia?.bgImageUrl}
                 bgVideoUrl={currentSlide.resolvedMedia?.bgVideoUrl}
+                bgVideoPosterUrl={currentSlide.resolvedMedia?.bgVideoPosterUrl}
                 phoneMockupUrl={currentSlide.resolvedMedia?.phoneMockupUrl}
               />
             </div>

@@ -21,6 +21,12 @@ interface ParishIdentityProps {
   logoUrl?: string;
   bgImageUrl?: string;
   bgVideoUrl?: string;
+  // Still frame captured at upload — admin previews (slide cards, editor,
+  // Now Playing) render this instead of streaming the video from Blob.
+  bgVideoPosterUrl?: string;
+  // Explicit opt-in to actually stream + play the video (the full-size
+  // preview page). Admin thumbnails never set this.
+  bgVideoAutoPlay?: boolean;
   // When true, the bg video is mounted by the Player at a layer above the
   // SlideFrame and persists across slide rotations — this template should
   // skip rendering its own <video> and let the parent show through.
@@ -52,7 +58,7 @@ function parseSublineLines(html: string): string[] {
     .filter(Boolean);
 }
 
-export function ParishIdentity({ content, orientation = 'portrait', logoUrl, bgImageUrl, bgVideoUrl, bgVideoExternal }: ParishIdentityProps) {
+export function ParishIdentity({ content, orientation = 'portrait', logoUrl, bgImageUrl, bgVideoUrl, bgVideoPosterUrl, bgVideoAutoPlay, bgVideoExternal }: ParishIdentityProps) {
   const { headline, subline, logoSize, headlineSize } = content;
 
   const logoMaxWidth = resolveLogoWidth(logoSize);
@@ -69,9 +75,14 @@ export function ParishIdentity({ content, orientation = 'portrait', logoUrl, bgI
 
   return (
     <div className={`relative w-full h-full overflow-hidden ${rootBg}`}>
-      {/* Background media (video > image > gradient fallback) */}
+      {/* Background media (video > image > gradient fallback).
+          Outside the player (bgVideoExternal unset = admin previews), the
+          video is never streamed: the captured poster frame stands in. A
+          legacy video without a poster mounts metadata-only (~KBs, shows
+          the first frame) instead of the old autoplay+preload=auto, which
+          re-streamed the full file on every admin page view. */}
       {bgVideoUrl ? (
-        bgVideoExternal ? null : (
+        bgVideoExternal ? null : bgVideoAutoPlay ? (
           <video
             src={bgVideoUrl}
             autoPlay
@@ -79,6 +90,23 @@ export function ParishIdentity({ content, orientation = 'portrait', logoUrl, bgI
             loop
             playsInline
             preload="auto"
+            poster={bgVideoPosterUrl}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : bgVideoPosterUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={bgVideoPosterUrl}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <video
+            src={bgVideoUrl}
+            muted
+            loop
+            playsInline
+            preload="metadata"
             className="absolute inset-0 w-full h-full object-cover"
           />
         )

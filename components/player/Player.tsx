@@ -373,13 +373,13 @@ export function Player({ displayId }: PlayerProps) {
   // is mounted exactly once and persists across slide rotations. Without
   // this, every cycle remounted a fresh <video> and Blob re-streamed the
   // file.
-  const poolVideoUrls = useMemo(() => {
-    const urls = new Set<string>();
+  const poolVideos = useMemo(() => {
+    const byUrl = new Map<string, string | undefined>();
     for (const s of pool) {
       const u = s.resolvedMedia?.bgVideoUrl;
-      if (u) urls.add(u);
+      if (u && !byUrl.has(u)) byUrl.set(u, s.resolvedMedia?.bgVideoPosterUrl);
     }
-    return [...urls];
+    return [...byUrl.entries()].map(([url, posterUrl]) => ({ url, posterUrl }));
   }, [pool]);
 
   if (!ready || pool.length === 0) {
@@ -403,7 +403,7 @@ export function Player({ displayId }: PlayerProps) {
 
   return (
     <div className="relative w-full h-full bg-navy-900">
-      <BgVideoStack urls={poolVideoUrls} activeUrl={currentVideoUrl} />
+      <BgVideoStack videos={poolVideos} activeUrl={currentVideoUrl} />
       <SlideFrame
         slideId={`${current.id}-${currentIndex}`}
         holdMs={holdMs}

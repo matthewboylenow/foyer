@@ -89,6 +89,9 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
     ? await db.query.media.findMany({ where: (m, { inArray }) => inArray(m.id, Array.from(mediaIds)) })
     : [];
   const mediaMap = new Map(mediaRows.map((m) => [m.id, m.blobUrl]));
+  const posterMap = new Map(
+    mediaRows.filter((m) => m.posterUrl).map((m) => [m.id, m.posterUrl as string]),
+  );
 
   return filtered.map((s): EligibleSlide => {
     const c = s._effective as unknown as Record<string, unknown>;
@@ -109,6 +112,8 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
     if (typeof c?.bgVideoMediaId === 'string') {
       const url = mediaMap.get(c.bgVideoMediaId);
       if (url) resolved.bgVideoUrl = url;
+      const poster = posterMap.get(c.bgVideoMediaId);
+      if (poster) resolved.bgVideoPosterUrl = poster;
     }
     if (typeof c?.phoneMockupMediaId === 'string') {
       const url = mediaMap.get(c.phoneMockupMediaId);
@@ -167,6 +172,7 @@ function resolveContentMedia(
   templateType: string,
   tenantLogoMediaId: string | null,
   mediaMap: Map<string, string>,
+  posterMap?: Map<string, string>,
 ): Record<string, string> | null {
   if (!content || typeof content !== 'object') return null;
   if (Object.keys(content as Record<string, unknown>).length === 0) return null;
@@ -187,6 +193,8 @@ function resolveContentMedia(
   if (typeof c.bgVideoMediaId === 'string') {
     const url = mediaMap.get(c.bgVideoMediaId);
     if (url) resolved.bgVideoUrl = url;
+    const poster = posterMap?.get(c.bgVideoMediaId);
+    if (poster) resolved.bgVideoPosterUrl = poster;
   }
   if (typeof c.phoneMockupMediaId === 'string') {
     const url = mediaMap.get(c.phoneMockupMediaId);
@@ -224,13 +232,16 @@ export async function getSlidesByTenantWithMedia(tenantId: string): Promise<Slid
     ? await db.query.media.findMany({ where: (m, { inArray }) => inArray(m.id, Array.from(mediaIds)) })
     : [];
   const mediaMap = new Map(mediaRows.map((m) => [m.id, m.blobUrl]));
+  const posterMap = new Map(
+    mediaRows.filter((m) => m.posterUrl).map((m) => [m.id, m.posterUrl as string]),
+  );
   const tenantLogoId = tenantSettings?.logoMediaId ?? null;
 
   return list.map((s) => ({
     ...s,
     resolvedMedia: {
-      portrait: resolveContentMedia(s.content, s.templateType, tenantLogoId, mediaMap),
-      landscape: resolveContentMedia(s.contentLandscape, s.templateType, tenantLogoId, mediaMap),
+      portrait: resolveContentMedia(s.content, s.templateType, tenantLogoId, mediaMap, posterMap),
+      landscape: resolveContentMedia(s.contentLandscape, s.templateType, tenantLogoId, mediaMap, posterMap),
     },
   }));
 }

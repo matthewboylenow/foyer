@@ -32,6 +32,7 @@ type OrientationMedia = {
   logoUrl?: string | null;
   bgImageUrl?: string | null;
   bgVideoUrl?: string | null;
+  bgVideoPosterUrl?: string | null;
   phoneMockupUrl?: string | null;
 };
 
@@ -143,12 +144,14 @@ export function SlideEditor({
     logoUrl: initialMedia?.portrait?.logoUrl ?? null,
     bgImageUrl: initialMedia?.portrait?.bgImageUrl ?? null,
     bgVideoUrl: initialMedia?.portrait?.bgVideoUrl ?? null,
+    bgVideoPosterUrl: initialMedia?.portrait?.bgVideoPosterUrl ?? null,
     phoneMockupUrl: initialMedia?.portrait?.phoneMockupUrl ?? null,
   });
   const [landscapeMedia, setLandscapeMedia] = useState<OrientationMedia>({
     logoUrl: initialMedia?.landscape?.logoUrl ?? null,
     bgImageUrl: initialMedia?.landscape?.bgImageUrl ?? null,
     bgVideoUrl: initialMedia?.landscape?.bgVideoUrl ?? null,
+    bgVideoPosterUrl: initialMedia?.landscape?.bgVideoPosterUrl ?? null,
     phoneMockupUrl: initialMedia?.landscape?.phoneMockupUrl ?? null,
   });
 
@@ -350,7 +353,10 @@ export function SlideEditor({
               bgImageUrl={activeMedia.bgImageUrl ?? null}
               onBgImageChange={(url) => updateActiveMedia({ bgImageUrl: url })}
               bgVideoUrl={activeMedia.bgVideoUrl ?? null}
-              onBgVideoChange={(url) => updateActiveMedia({ bgVideoUrl: url })}
+              bgVideoPosterUrl={activeMedia.bgVideoPosterUrl ?? null}
+              onBgVideoChange={(url, posterUrl) =>
+                updateActiveMedia({ bgVideoUrl: url, bgVideoPosterUrl: posterUrl ?? null })
+              }
               phoneMockupUrl={activeMedia.phoneMockupUrl ?? null}
               onPhoneMockupChange={(url) => updateActiveMedia({ phoneMockupUrl: url })}
               slideLogoUrl={activeMedia.logoUrl ?? null}
@@ -414,6 +420,7 @@ export function SlideEditor({
                 logoUrl={activeMedia.logoUrl ?? tenantLogoUrl ?? null}
                 bgImageUrl={activeMedia.bgImageUrl ?? null}
                 bgVideoUrl={activeMedia.bgVideoUrl ?? null}
+                bgVideoPosterUrl={activeMedia.bgVideoPosterUrl ?? null}
                 phoneMockupUrl={activeMedia.phoneMockupUrl ?? null}
                 width={activeOrientation === 'portrait' ? 280 : 380}
               />
@@ -735,7 +742,8 @@ interface TemplateFieldsProps {
   bgImageUrl: string | null;
   onBgImageChange: (url: string | null) => void;
   bgVideoUrl: string | null;
-  onBgVideoChange: (url: string | null) => void;
+  bgVideoPosterUrl: string | null;
+  onBgVideoChange: (url: string | null, posterUrl?: string | null) => void;
   phoneMockupUrl: string | null;
   onPhoneMockupChange: (url: string | null) => void;
   slideLogoUrl: string | null;
@@ -749,6 +757,7 @@ function TemplateFields({
   bgImageUrl,
   onBgImageChange,
   bgVideoUrl,
+  bgVideoPosterUrl,
   onBgVideoChange,
   phoneMockupUrl,
   onPhoneMockupChange,
@@ -831,13 +840,14 @@ function TemplateFields({
             <VideoUpload
               label="Background video (plays silently on a loop)"
               currentUrl={bgVideoUrl}
-              onUploaded={({ id, blobUrl }) => {
+              currentPosterUrl={bgVideoPosterUrl}
+              onUploaded={({ id, blobUrl, posterUrl }) => {
                 set('bgVideoMediaId', id);
-                onBgVideoChange(blobUrl);
+                onBgVideoChange(blobUrl, posterUrl);
               }}
               onCleared={() => {
                 set('bgVideoMediaId', undefined);
-                onBgVideoChange(null);
+                onBgVideoChange(null, null);
               }}
             />
           </div>

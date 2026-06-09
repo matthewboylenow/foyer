@@ -2,8 +2,14 @@
 
 import { useEffect, useRef } from 'react';
 
+export interface BgVideoEntry {
+  url: string;
+  /** Captured still frame — painted while the first bytes stream in. */
+  posterUrl?: string;
+}
+
 interface BgVideoStackProps {
-  urls: string[];
+  videos: BgVideoEntry[];
   activeUrl: string | null;
 }
 
@@ -15,17 +21,17 @@ interface BgVideoStackProps {
  * <video> on every slide rotation, which forced fresh Range requests to Blob
  * each cycle and dominated transfer usage.
  */
-export function BgVideoStack({ urls, activeUrl }: BgVideoStackProps) {
+export function BgVideoStack({ videos, activeUrl }: BgVideoStackProps) {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {urls.map((url) => (
-        <BgVideoEl key={url} url={url} active={url === activeUrl} />
+      {videos.map((v) => (
+        <BgVideoEl key={v.url} url={v.url} posterUrl={v.posterUrl} active={v.url === activeUrl} />
       ))}
     </div>
   );
 }
 
-function BgVideoEl({ url, active }: { url: string; active: boolean }) {
+function BgVideoEl({ url, posterUrl, active }: { url: string; posterUrl?: string; active: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -49,6 +55,7 @@ function BgVideoEl({ url, active }: { url: string; active: boolean }) {
       loop
       playsInline
       preload="auto"
+      poster={posterUrl}
       style={{
         position: 'absolute',
         inset: 0,
