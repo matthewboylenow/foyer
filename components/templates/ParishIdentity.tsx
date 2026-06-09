@@ -175,7 +175,7 @@ export function ParishIdentity({ content, orientation = 'portrait', logoUrl, bgI
                 <p
                   className="font-serif italic text-cream text-center leading-snug"
                   style={{
-                    fontSize: 38,
+                    fontSize: 40,
                     opacity: 0.92,
                     letterSpacing: '0.015em',
                     textShadow: '0 2px 14px rgba(0,0,0,0.35)',

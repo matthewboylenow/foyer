@@ -7,6 +7,7 @@ import { Upload, X, ImageIcon, Library } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useTenantSlug } from '@/lib/tenant-client';
+import { optimizeImageFile } from '@/lib/optimizeImage';
 import { MediaLibraryPicker } from './MediaLibraryPicker';
 import { UploadProgress } from './UploadProgress';
 
@@ -34,13 +35,22 @@ export function ImageUpload({
   const inputRef = useRef<HTMLInputElement>(null);
   const tenantSlug = useTenantSlug();
 
-  async function handleFile(file: File) {
+  async function handleFile(original: File) {
+    setProgress(0);
+    // Downscale + recompress in the browser before anything hits Blob
+    // storage — keeps stored assets (and every display's download of them)
+    // within the transfer budget regardless of what gets dropped in.
+    const file = await optimizeImageFile(original, type === 'logo' ? 'logo' : 'image');
     if (file.size > maxSizeMB * 1024 * 1024) {
+      setProgress(null);
       toast.error(`File too large (max ${maxSizeMB} MB)`);
       return;
     }
+    if (file.size < original.size * 0.9) {
+      const mb = (n: number) => `${(n / (1024 * 1024)).toFixed(1)} MB`;
+      toast.info(`Optimized ${mb(original.size)} → ${mb(file.size)} before upload`);
+    }
 
-    setProgress(0);
     try {
       // 1. Upload directly to Vercel Blob (browser → blob storage, never
       //    through our serverless function — so the 4.5 MB body limit

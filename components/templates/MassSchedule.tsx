@@ -73,7 +73,7 @@ function SectionTitle({ text, delay, accentClass }: { text: string; delay: numbe
   return (
     <motion.p
       className={`col-span-2 font-sans uppercase tracking-widest text-left ${accentClass}`}
-      style={{ fontSize: 28 }}
+      style={{ fontSize: 32 }}
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8, delay: delay / 1000, ease: EASING }}
@@ -105,8 +105,8 @@ export function MassSchedule({ content, orientation = 'portrait', bgImageUrl }: 
     : totalRows;
   const tight = densityRows > 10;
   const medium = densityRows > 6 && densityRows <= 10;
-  const timeSize = tight ? 40 : medium ? 44 : 48;
-  const intentionSize = tight ? 28 : medium ? 30 : 32;
+  const timeSize = tight ? 44 : medium ? 48 : 52;
+  const intentionSize = tight ? 32 : medium ? 34 : 38;
 
   const titleDelay = 1100;
   const rowGap = 130;

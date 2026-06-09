@@ -52,6 +52,11 @@ export async function POST(req: Request) {
           allowedContentTypes: isVideo ? ALLOWED_VIDEO : ALLOWED_IMAGE,
           maximumSizeInBytes: isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES,
           addRandomSuffix: true,
+          // Random-suffix URLs never change content, so let browsers and
+          // the image optimizer cache them for a year instead of the
+          // 30-day default — fewer repeat GETs (Blob "simple operations")
+          // and less egress from displays re-fetching unchanged assets.
+          cacheControlMaxAge: 31536000,
         };
       },
       onUploadCompleted: async () => {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { getImageProps } from 'next/image';
 import { SlideFrame } from './SlideFrame';
 import { SlideErrorBoundary } from './SlideErrorBoundary';
 import { BgVideoStack } from './BgVideoStack';
@@ -208,43 +209,49 @@ export function Player({ displayId }: PlayerProps) {
   // image decode never blocks the cross-dissolve. Without this, the new
   // template mounts and Image decode hitches the GPU exactly when the
   // transition is supposed to be smooth — the "bloated cut" feeling.
+  //
+  // Background images must warm the SAME /_next/image URL that KenBurns
+  // renders. The old code set img.src to the raw blob URL, which downloaded
+  // the full-size original from Blob storage (pure egress) and then the
+  // real render fetched the optimized variant anyway — the warm-up never
+  // helped and doubled transfer. getImageProps with the same props KenBurns
+  // uses yields an identical srcset/sizes pair, so the browser resolves the
+  // exact candidate the upcoming <Image> will request.
+  //
+  // No video prewarm: BgVideoStack mounts every pool video once with
+  // preload="auto" and never unmounts it, so the bytes are already
+  // resident. The old per-rotation Range fetch couldn't be served from
+  // the browser cache reliably (206 responses) and re-streamed the file
+  // from Blob on every slide change.
   useEffect(() => {
     if (pool.length === 0) return;
     const next = pool[(currentIndex + 1) % pool.length];
-    const imgUrls = [
-      next?.resolvedMedia?.bgImageUrl,
-      next?.resolvedMedia?.logoUrl,
-      next?.resolvedMedia?.phoneMockupUrl,
-    ].filter((u): u is string => Boolean(u));
 
-    for (const url of imgUrls) {
+    const warm = (p: { src: string; srcSet?: string; sizes?: string }) => {
       const img = new window.Image();
-      img.src = url;
+      if (p.srcSet) img.srcset = p.srcSet;
+      if (p.sizes) img.sizes = p.sizes;
+      img.src = p.src;
       // Hint to the browser to decode off the main thread when supported.
       if (typeof img.decode === 'function') {
         img.decode().catch(() => {
           // Decode can reject if the resource is replaced — safe to ignore.
         });
       }
+    };
+
+    const bgUrl = next?.resolvedMedia?.bgImageUrl;
+    if (bgUrl) {
+      // Must mirror KenBurns' <Image fill sizes="100vw"> exactly.
+      const { props } = getImageProps({ src: bgUrl, alt: '', fill: true, sizes: '100vw' });
+      warm({ src: props.src, srcSet: props.srcSet, sizes: props.sizes });
     }
 
-    // Warm the HTTP cache for the next slide's background video so the
-    // <video> element doesn't sit on a black/gradient fallback for several
-    // seconds while it downloads. We send a `Range: bytes=0-` header
-    // because <video> elements issue range requests for playback — a plain
-    // GET cache entry from `force-cache` wouldn't satisfy the byte-range
-    // lookup, so the video would re-download anyway.
-    const videoUrl = next?.resolvedMedia?.bgVideoUrl;
-    if (!videoUrl) return;
-    const ctrl = new AbortController();
-    fetch(videoUrl, {
-      signal: ctrl.signal,
-      cache: 'force-cache',
-      headers: { Range: 'bytes=0-' },
-    }).catch(() => {
-      /* network blip or aborted — playback fetch will retry */
-    });
-    return () => ctrl.abort();
+    // Logos / mockups render as plain <img> in their templates, so the raw
+    // URL is the right one to warm.
+    for (const url of [next?.resolvedMedia?.logoUrl, next?.resolvedMedia?.phoneMockupUrl]) {
+      if (url) warm({ src: url });
+    }
   }, [currentIndex, pool]);
 
   // Watchdog: reload page if slide doesn't advance in 3× its expected duration

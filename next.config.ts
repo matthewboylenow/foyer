@@ -8,6 +8,10 @@ const config: NextConfig = {
     remotePatterns: [
       { protocol: 'https', hostname: '*.public.blob.vercel-storage.com' },
     ],
+    // Blob URLs are immutable (random suffix per upload), so optimized
+    // variants can sit in the image cache for 31 days minimum — keeps the
+    // optimizer from re-fetching originals from Blob storage.
+    minimumCacheTTL: 2678400,
   },
   headers: async () => [
     {
