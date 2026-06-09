@@ -46,8 +46,11 @@ they act:
 
 1. **On upload (browser):** `lib/optimizeImage.ts` downscales backgrounds to ≤2560px
    and re-encodes to WebP before anything reaches Blob; logos are downscaled only,
-   keeping their format. Videos are capped at 15 MB by the upload token
-   (`app/api/upload/client/route.ts`).
+   keeping their format. `lib/optimizeVideo.ts` re-encodes videos over 8 MB with
+   WebCodecs (via mediabunny): 1920px long edge, ~5 Mbps H.264, audio stripped —
+   so a raw 100 MB phone clip lands at a few MB with no manual re-encoding. The
+   upload token (`app/api/upload/client/route.ts`) still caps stored videos at
+   15 MB as the backstop (browsers without WebCodecs upload the original).
 2. **In storage:** blob URLs are immutable (random suffix), so uploads set a 1-year
    `Cache-Control` — browsers and the image optimizer never re-fetch unchanged files.
 3. **On the player:** background images render through `next/image` (the optimizer's

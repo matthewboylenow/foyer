@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useTenantSlug } from '@/lib/tenant-client';
 import { captureVideoPoster } from '@/lib/videoPoster';
+import { optimizeVideoFile } from '@/lib/optimizeVideo';
 import { UploadProgress } from './UploadProgress';
 
 interface VideoUploadProps {
@@ -29,15 +30,41 @@ export function VideoUpload({
   maxSizeMB = 15,
 }: VideoUploadProps) {
   const [progress, setProgress] = useState<number | null>(null);
+  const [phase, setPhase] = useState<'optimizing' | 'uploading'>('uploading');
   const inputRef = useRef<HTMLInputElement>(null);
   const tenantSlug = useTenantSlug();
 
-  async function handleFile(file: File) {
-    if (file.size > maxSizeMB * 1024 * 1024) {
-      toast.error(`File too large (max ${maxSizeMB} MB). Try a shorter loop or lower bitrate.`);
+  async function handleFile(original: File) {
+    // Hard input ceiling — beyond this, even re-encoding would mean reading
+    // hundreds of MB into browser memory.
+    if (original.size > 500 * 1024 * 1024) {
+      toast.error('File too large (max 500 MB input). Trim the clip first.');
       return;
     }
 
+    // Re-encode in the browser: 1920px long edge, ~5 Mbps H.264, audio
+    // stripped (signage plays muted). Big phone clips come out a few MB;
+    // already-small files pass through untouched.
+    setPhase('optimizing');
+    setProgress(0);
+    const file = await optimizeVideoFile(original, setProgress);
+
+    if (file.size > maxSizeMB * 1024 * 1024) {
+      setProgress(null);
+      const mb = (file.size / (1024 * 1024)).toFixed(0);
+      toast.error(
+        file === original
+          ? `File too large (max ${maxSizeMB} MB) and this browser can't compress it. Re-encode at ~5 Mbps or use Chrome/Edge.`
+          : `Still ${mb} MB after compression (max ${maxSizeMB} MB) — use a shorter loop (5–15s).`,
+      );
+      return;
+    }
+    if (file.size < original.size * 0.9) {
+      const mb = (n: number) => `${(n / (1024 * 1024)).toFixed(1)} MB`;
+      toast.info(`Compressed ${mb(original.size)} → ${mb(file.size)} before upload`);
+    }
+
+    setPhase('uploading');
     setProgress(0);
     try {
       const pathname = tenantSlug ? `${tenantSlug}/${file.name}` : file.name;
@@ -101,7 +128,10 @@ export function VideoUpload({
       {label && <Label>{label}</Label>}
 
       {uploading ? (
-        <UploadProgress percent={progress ?? 0} label="Uploading video…" />
+        <UploadProgress
+          percent={progress ?? 0}
+          label={phase === 'optimizing' ? 'Compressing video…' : 'Uploading video…'}
+        />
       ) : currentUrl ? (
         <div className="flex items-start gap-3">
           {/* preload=none + poster: zero video bytes until the admin
@@ -151,7 +181,7 @@ export function VideoUpload({
           <Film size={24} />
           <span className="text-sm">Click to upload</span>
           <span className="text-xs text-center">
-            MP4 / WebM · 5–15s loop · keep under {maxSizeMB} MB (re-encode at ~3–6 Mbps)
+            MP4 / MOV / WebM · 5–15s loop · large files are compressed automatically
           </span>
         </button>
       )}
