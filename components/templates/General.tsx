@@ -59,7 +59,7 @@ export function General({ content, orientation = 'portrait', bgImageUrl }: Gener
           <BlurIn delay={900} duration={900} y={0}>
             <motion.p
               className={`font-sans uppercase tracking-widest mb-10 inline-block ${p.accent}`}
-              style={{ fontSize: 28, paddingLeft: '0.1em' }}
+              style={{ fontSize: 34, paddingLeft: '0.1em' }}
               initial={{ x: -16 }}
               animate={{ x: 0 }}
               transition={{ duration: 0.9, delay: 0.9, ease: [0.16, 1, 0.3, 1] }}

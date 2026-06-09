@@ -68,6 +68,11 @@
 
   --color-cream: #FAF9F7;
   --color-gold: #D4AF37;
+  /* Type-safe gold: the base gold lifted 25% toward white. Deep gold stays
+     for rules/glows/ornaments, but at TV distance gold *text* over tinted
+     bg photos needs the extra luminance. TenantTheme derives this from the
+     tenant's gold the same way. */
+  --color-gold-bright: #DFC369;
   --color-ink: #0B0D12;
 
   /* Display type scale for 1080×1920 canvas */

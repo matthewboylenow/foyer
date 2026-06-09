@@ -26,11 +26,11 @@ export function WeeklyAssociation({ content, orientation = 'portrait', bgImageUr
   const columns = isLandscape ? Math.min(3, Math.max(2, Math.ceil(names.length / 5))) : 1;
   const fontSize = isLandscape
     ? names.length > 12
-      ? Math.max(28, 40 - (names.length - 12) * 1)
-      : 40
+      ? Math.max(32, 46 - (names.length - 12) * 1)
+      : 46
     : names.length > 7
-      ? Math.max(32, 44 - (names.length - 7) * 2)
-      : 44;
+      ? Math.max(36, 50 - (names.length - 7) * 2)
+      : 50;
 
   return (
     <div className={`relative w-full h-full overflow-hidden ${p.pageBg}`}>
@@ -46,7 +46,7 @@ export function WeeklyAssociation({ content, orientation = 'portrait', bgImageUr
           <div className="text-center mb-6">
             <p
               className={`font-sans uppercase tracking-widest ${p.accent}`}
-              style={{ fontSize: 22 }}
+              style={{ fontSize: 28 }}
             >
               This Week We Pray For
             </p>

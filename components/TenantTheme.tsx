@@ -78,6 +78,9 @@ export async function TenantTheme({ children }: { children: React.ReactNode }) {
     '--color-rust-700': mix(rust, '#000000', 0.22),
     '--color-cream': cream,
     '--color-gold': gold,
+    // Brightened variant used for gold *text* on dark/tinted backgrounds —
+    // same 25%-toward-white lift as the #DFC369 default in globals.css.
+    '--color-gold-bright': mix(gold, '#ffffff', 0.25),
     // Override the variables the root layout sets via next/font. Tailwind's
     // font-serif / font-sans utility classes resolve to var(--font-serif)
     // / var(--font-sans), so the whole subtree (admin previews + the

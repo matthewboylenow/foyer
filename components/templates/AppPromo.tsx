@@ -82,7 +82,7 @@ export function AppPromo({ content, orientation = 'portrait', bgImageUrl, phoneM
             </BlurIn>
             <BlurIn delay={2200} duration={900} y={6} blur={4} as="p">
               <span
-                className="font-serif text-gold block"
+                className="font-serif text-gold-bright block"
                 style={{ fontSize: 56, textShadow: '0 4px 20px rgba(212,175,55,0.25)' }}
               >
                 {url}
@@ -153,7 +153,7 @@ export function AppPromo({ content, orientation = 'portrait', bgImageUrl, phoneM
 
           <BlurIn delay={2200} duration={900} y={6} blur={4} as="p">
             <span
-              className="font-serif text-gold block"
+              className="font-serif text-gold-bright block"
               style={{ fontSize: 64, textShadow: '0 4px 20px rgba(212,175,55,0.25)' }}
             >
               {url}

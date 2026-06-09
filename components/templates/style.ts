@@ -30,7 +30,9 @@ export function palette(mode: TextMode): Palette {
     return {
       pageBg: 'bg-navy-900',
       primary: 'text-cream',
-      accent: 'text-gold',
+      // gold-bright (not gold) — text needs the lifted variant to stay
+      // readable over the 0.42-opacity tint; rules keep the deep gold.
+      accent: 'text-gold-bright',
       rule: 'bg-gold',
       bgImageTint:
         'linear-gradient(180deg, rgba(11,19,42,0.6) 0%, rgba(11,19,42,0.42) 50%, rgba(11,19,42,0.78) 100%)',

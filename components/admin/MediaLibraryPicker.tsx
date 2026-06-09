@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { toast } from 'sonner';
 import { Search, Trash2, ImageIcon } from 'lucide-react';
 import {
@@ -15,6 +16,12 @@ import { Button } from '@/components/ui/button';
 import type { Media } from '@/lib/db/schema';
 
 type LibraryFilter = 'image' | 'logo' | 'video' | 'image-or-logo';
+
+function formatBytes(bytes: number | null) {
+  if (!bytes) return '';
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 interface MediaLibraryPickerProps {
   open: boolean;
@@ -133,18 +140,23 @@ export function MediaLibraryPicker({
                       onSelect({ id: m.id, blobUrl: m.blobUrl, filename: m.filename });
                       onOpenChange(false);
                     }}
-                    className="block w-full aspect-square flex items-center justify-center p-2"
+                    className="relative block w-full aspect-square p-2"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    {/* next/image downscales blob originals so opening the
+                        picker doesn't stream full-res files. */}
+                    <Image
                       src={m.blobUrl}
                       alt={m.filename}
-                      className="max-w-full max-h-full object-contain"
+                      fill
+                      sizes="(min-width: 768px) 180px, (min-width: 640px) 33vw, 50vw"
+                      className="object-contain p-2"
+                      unoptimized={m.blobUrl.endsWith('.svg')}
                     />
                   </button>
                   <div className="px-2 py-1.5 border-t border-border bg-background/80 flex items-center gap-2">
                     <span className="text-[11px] text-muted-foreground truncate flex-1" title={m.filename}>
                       {m.filename}
+                      {m.bytes ? ` · ${formatBytes(m.bytes)}` : ''}
                     </span>
                     <Button
                       type="button"

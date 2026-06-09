@@ -38,6 +38,27 @@ For a first read, go in numeric order. For implementation, the suggested build o
 6. **Paste-to-parse** is the authoring pattern for Mass intentions. Vercel-style. Vital for keeping update time under 90 seconds.
 7. **Tenant ID reserved in schema** from day one so a future multi-tenant SaaS is not a rewrite.
 
+## Media & Blob Budget
+
+Displays run 24/7, so every byte an asset weighs is paid for repeatedly in Vercel Blob
+data transfer and per-request "simple operations." The guardrails, in order of where
+they act:
+
+1. **On upload (browser):** `lib/optimizeImage.ts` downscales backgrounds to ≤2560px
+   and re-encodes to WebP before anything reaches Blob; logos are downscaled only,
+   keeping their format. Videos are capped at 15 MB by the upload token
+   (`app/api/upload/client/route.ts`).
+2. **In storage:** blob URLs are immutable (random suffix), so uploads set a 1-year
+   `Cache-Control` — browsers and the image optimizer never re-fetch unchanged files.
+3. **On the player:** background images render through `next/image` (the optimizer's
+   edge cache serves displays; Blob is only hit on a cache miss), the next-slide
+   prewarm warms that same optimized URL — never the raw original — and bg videos are
+   mounted once per page load by `BgVideoStack` instead of re-streaming per rotation.
+
+Rules of thumb when authoring: background photos should land under ~1 MB after the
+automatic compression; video loops ~10s at ≤15 MB; check the media library, which
+shows the stored size of every asset, and delete unused files.
+
 ## Brand and Voice
 
 This app does not generate content. The brand voice (warm, personal, Saint Helen) is enforced by the content authored in the admin, not by the templates. The templates enforce the visual brand: navy, rust, cream, gold, Libre Baskerville and Libre Franklin.

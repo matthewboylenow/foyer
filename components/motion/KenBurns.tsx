@@ -22,7 +22,9 @@ export function KenBurns({ src, alt = '', duration = 20000, className }: KenBurn
         className="ken-burns-anim absolute inset-0"
         style={{ animationDuration: `${duration}ms` }}
       >
-        <Image src={src} alt={alt} fill className="object-cover" priority />
+        {/* sizes="100vw" is load-bearing: Player's prewarm builds the same
+            srcset via getImageProps so the warmed URL matches this render. */}
+        <Image src={src} alt={alt} fill sizes="100vw" className="object-cover" priority />
       </div>
     </div>
   );
