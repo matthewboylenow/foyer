@@ -1,27 +1,27 @@
+import { sql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { displays } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
 
 /**
  * POST /api/display/[displayId]/heartbeat
  *
  * Body: { slideId: string | null }
  *
- * Called by the TV player on every slide change. Unauthenticated by design
- * — the displayId itself is the credential (it's a UUID embedded in the
- * kiosk URL, same trust model as the GET endpoint that serves slides).
+ * Called by the TV player every 5 minutes (it used to fire on every slide
+ * change — a write every ~15s per display, 24/7, which alone kept Neon
+ * compute awake around the clock). Unauthenticated by design — the
+ * displayId itself is the credential (a UUID embedded in the kiosk URL,
+ * same trust model as the GET endpoint that serves slides).
  *
- * Writes the new currentSlideId, currentSlideStartedAt, and lastHeartbeatAt
- * so the admin Displays view can show what's on screen right now. If the
- * incoming slideId matches what's already stored, only lastHeartbeatAt is
- * touched — that way "time on screen" stays accurate across page reloads.
+ * Single round trip: the CASE keeps currentSlideStartedAt stable when the
+ * reported slide hasn't changed (so "time on screen" survives reloads),
+ * without a SELECT-then-UPDATE pair.
  */
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ displayId: string }> },
 ) {
   const { displayId } = await params;
-  const now = new Date();
 
   let slideId: string | null = null;
   try {
@@ -32,24 +32,23 @@ export async function POST(
     // "still alive, no slide change."
   }
 
-  const existing = await db.query.displays.findFirst({
-    where: eq(displays.id, displayId),
-    columns: { currentSlideId: true },
-  });
-  if (!existing) {
-    return Response.json({ error: 'Unknown display' }, { status: 404 });
-  }
-
-  const slideChanged = slideId && slideId !== existing.currentSlideId;
-  await db
+  const updated = await db
     .update(displays)
     .set({
-      lastHeartbeatAt: now,
-      ...(slideChanged
-        ? { currentSlideId: slideId, currentSlideStartedAt: now }
+      lastHeartbeatAt: sql`now()`,
+      ...(slideId
+        ? {
+            currentSlideStartedAt: sql`CASE WHEN ${displays.currentSlideId} IS NOT DISTINCT FROM ${slideId} THEN ${displays.currentSlideStartedAt} ELSE now() END`,
+            currentSlideId: slideId,
+          }
         : {}),
     })
-    .where(eq(displays.id, displayId));
+    .where(eq(displays.id, displayId))
+    .returning({ id: displays.id });
+
+  if (updated.length === 0) {
+    return Response.json({ error: 'Unknown display' }, { status: 404 });
+  }
 
   return Response.json({ ok: true }, {
     headers: { 'Cache-Control': 'no-store' },

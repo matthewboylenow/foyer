@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { displays } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
+import { revalidateDisplayContent } from '@/lib/cacheTags';
 
 export async function PATCH(
   req: Request,
@@ -24,6 +25,7 @@ export async function PATCH(
 
   const [updated] = await db.update(displays).set(update).where(eq(displays.id, id)).returning();
   if (!updated) return Response.json({ error: 'Not found' }, { status: 404 });
+  revalidateDisplayContent();
   return Response.json(updated);
 }
 
@@ -38,5 +40,6 @@ export async function DELETE(
 
   const { id } = await params;
   await db.delete(displays).where(eq(displays.id, id));
+  revalidateDisplayContent();
   return new Response(null, { status: 204 });
 }

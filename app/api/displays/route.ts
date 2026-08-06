@@ -2,6 +2,7 @@ import { db } from '@/lib/db/client';
 import { displays } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
 import { getCurrentTenant } from '@/lib/tenant';
+import { revalidateDisplayContent } from '@/lib/cacheTags';
 export async function POST(req: Request) {
   const session = await auth();
   if (!session && process.env.AUTH_DEV_BYPASS !== '1') {
@@ -26,5 +27,6 @@ export async function POST(req: Request) {
     })
     .returning();
 
+  revalidateDisplayContent();
   return Response.json(created, { status: 201 });
 }

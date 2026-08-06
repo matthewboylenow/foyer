@@ -4,6 +4,7 @@ import { slides, collections } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
 import { logAudit } from '@/lib/auth/session';
 import { getCurrentTenant } from '@/lib/tenant';
+import { revalidateDisplayContent } from '@/lib/cacheTags';
 /**
  * PATCH /api/collections/[id]/active
  * Body: { active: boolean }
@@ -51,5 +52,6 @@ export async function PATCH(
     metadata: { count: result.length },
   });
 
+  revalidateDisplayContent();
   return Response.json({ ok: true, count: result.length });
 }
