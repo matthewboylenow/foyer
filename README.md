@@ -67,6 +67,27 @@ Rules of thumb when authoring: background photos should land under ~1 MB after t
 automatic compression; video loops ~10s at ≤15 MB; check the media library, which
 shows the stored size of every asset, and delete unused files.
 
+## Database (Neon) Budget
+
+Displays poll 24/7, so uncached reads or chatty writes keep Neon compute awake
+around the clock and bill accordingly. The guardrails:
+
+1. **Reads are cached** under the `display-content` tag (`lib/cacheTags.ts`):
+   the display payload, tenant lookup, and settings/theme are served from the
+   Next.js Data Cache with a 5-minute revalidate. Every admin mutation calls
+   `revalidateDisplayContent()`, so edits still reach screens on their next
+   30s poll — steady-state polling never touches Postgres. Dated slides
+   appear/expire within the 5-minute window.
+2. **Writes are rare**: the player heartbeats once per 5 minutes (single
+   round-trip UPDATE), not per slide change; the admin Displays page polls
+   status every 60s only while open.
+3. **Failure is graceful**: if the database is unreachable, the display page
+   renders with brand defaults and the player keeps playing from its
+   localStorage cache — screens never show an error page.
+
+In the Neon console: keep scale-to-zero enabled and cap autoscaling at 0.25 CU —
+this workload is a handful of queries every few minutes.
+
 ## Brand and Voice
 
 This app does not generate content. The brand voice (warm, personal, Saint Helen) is enforced by the content authored in the admin, not by the templates. The templates enforce the visual brand: navy, rust, cream, gold, Libre Baskerville and Libre Franklin.
