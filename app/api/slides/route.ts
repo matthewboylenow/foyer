@@ -4,6 +4,7 @@ import { slides } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
 import { logAudit } from '@/lib/auth/session';
 import { getCurrentTenant } from '@/lib/tenant';
+import { revalidateDisplayContent } from '@/lib/cacheTags';
 export async function GET() {
   const tenant = await getCurrentTenant();
   if (!tenant) return Response.json([]);
@@ -87,5 +88,6 @@ export async function POST(req: Request) {
     },
   });
 
+  revalidateDisplayContent();
   return Response.json(created, { status: 201 });
 }

@@ -8,11 +8,11 @@ import { getCurrentTenant } from '@/lib/tenant';
  *
  * Returns each display plus its current slide (with resolved media URLs)
  * and a derived status field. The admin Displays page polls this every
- * 10 seconds for the "Now Playing" view.
+ * 60 seconds for the "Now Playing" view.
  *
- * Status is derived from lastHeartbeatAt:
- *   - online  : heartbeat within 90s (player pings every 60s)
- *   - stale   : within 5 minutes (probably reloading / WiFi blip)
+ * Status is derived from lastHeartbeatAt (player pings every 5 minutes):
+ *   - online  : heartbeat within 11 minutes (2 pings + slack)
+ *   - stale   : within 30 minutes (probably reloading / WiFi blip)
  *   - offline : older, or never heartbeat
  */
 export async function GET() {
@@ -110,8 +110,10 @@ export async function GET() {
 
     const lastHeartbeatMs = d.lastHeartbeatAt ? new Date(d.lastHeartbeatAt).getTime() : 0;
     const ageSec = lastHeartbeatMs ? Math.floor((now - lastHeartbeatMs) / 1000) : Infinity;
+    // Player pings every 5 minutes: online = within 2 pings + slack,
+    // stale = within ~30 min (reloading / WiFi blip), offline beyond.
     const status: 'online' | 'stale' | 'offline' =
-      ageSec <= 90 ? 'online' : ageSec <= 300 ? 'stale' : 'offline';
+      ageSec <= 660 ? 'online' : ageSec <= 1800 ? 'stale' : 'offline';
 
     // Replace content with the orientation-resolved slot so the consumer
     // (DisplayManager thumbnail) renders the right layout without caring

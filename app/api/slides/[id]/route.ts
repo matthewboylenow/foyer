@@ -4,6 +4,7 @@ import { slides } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
 import { logAudit } from '@/lib/auth/session';
 import { getCurrentTenant } from '@/lib/tenant';
+import { revalidateDisplayContent } from '@/lib/cacheTags';
 import { diffObjects } from '@/lib/diff';
 
 export async function GET(
@@ -118,6 +119,7 @@ export async function PATCH(
     }
   }
 
+  revalidateDisplayContent();
   return Response.json(updated);
 }
 
@@ -155,5 +157,6 @@ export async function DELETE(
     });
   }
 
+  revalidateDisplayContent();
   return new Response(null, { status: 204 });
 }
