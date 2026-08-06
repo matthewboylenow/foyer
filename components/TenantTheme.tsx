@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { getCurrentTenant } from '@/lib/tenant';
-import { getSettingsByTenant } from '@/lib/db/queries';
+import { getSettingsByTenantCached } from '@/lib/db/queries';
 import { getFontPair, googleFontsUrlForPair, fontStackForPair } from '@/lib/fonts';
 
 /**
@@ -49,8 +49,17 @@ function mix(hex: string, target: string, t: number): string {
  * base color toward white/black so tenants don't have to set every swatch.
  */
 export async function TenantTheme({ children }: { children: React.ReactNode }) {
-  const tenant = await getCurrentTenant();
-  const settings = tenant ? await getSettingsByTenant(tenant.id) : null;
+  // Never let a database failure take down a TV. If Neon is unreachable
+  // (quota exhausted, outage), render with brand defaults — the Player
+  // below still serves slides from its localStorage cache, so the screen
+  // keeps playing instead of showing a Next.js error page.
+  let settings: Awaited<ReturnType<typeof getSettingsByTenantCached>> | null = null;
+  try {
+    const tenant = await getCurrentTenant();
+    settings = tenant ? await getSettingsByTenantCached(tenant.id) : null;
+  } catch (err) {
+    console.error('TenantTheme: falling back to brand defaults —', err);
+  }
 
   const navy = settings?.primaryColor || DEFAULTS.navy;
   const rust = settings?.accentColor || DEFAULTS.rust;

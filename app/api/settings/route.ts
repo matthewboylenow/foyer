@@ -3,6 +3,7 @@ import { db } from '@/lib/db/client';
 import { settings } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
 import { getCurrentTenant } from '@/lib/tenant';
+import { revalidateDisplayContent } from '@/lib/cacheTags';
 import { FONT_PAIRS } from '@/lib/fonts';
 export async function PATCH(req: Request) {
   const session = await auth();
@@ -42,5 +43,6 @@ export async function PATCH(req: Request) {
     .where(eq(settings.tenantId, tenant.id))
     .returning();
 
+  revalidateDisplayContent();
   return Response.json(updated);
 }
