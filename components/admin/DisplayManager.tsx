@@ -76,7 +76,10 @@ export function DisplayManager({ displays: initial }: DisplayManagerProps) {
       }
     }
     load();
-    const poll = setInterval(load, 10_000);
+    // 60s, not 10s — heartbeats only land every 5 minutes now, and a
+    // forgotten open admin tab polling a 4-query endpoint 24/7 was one of
+    // the things keeping Neon compute (and its bill) awake.
+    const poll = setInterval(load, 60_000);
     const clock = setInterval(() => setNow(Date.now()), 1_000);
     return () => {
       cancelled = true;
