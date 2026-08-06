@@ -1,5 +1,7 @@
+import { unstable_cache } from 'next/cache';
 import { eq, and, or, isNull, lte, gte, asc, desc } from 'drizzle-orm';
 import { db } from './client';
+import { DISPLAY_CONTENT_TAG } from '@/lib/cacheTags';
 import { slides, displays, settings, tenants, auditLog, errors, collections, media } from './schema';
 import type { SlideWithContent, SlideContent, SlideOrientation } from './schema';
 
@@ -264,6 +266,19 @@ export async function getSettingsByTenant(tenantId: string) {
     where: eq(settings.tenantId, tenantId),
   });
 }
+
+/**
+ * Data-Cache-backed settings lookup for hot, read-only paths (TenantTheme
+ * renders on every page). Invalidated by the display-content tag when
+ * settings are saved; the revalidate window is a safety net. Note the
+ * cached row is JSON-serialized, so Date fields come back as strings —
+ * fine for theming, use getSettingsByTenant where real types matter.
+ */
+export const getSettingsByTenantCached = unstable_cache(
+  async (tenantId: string) => getSettingsByTenant(tenantId),
+  ['settings-by-tenant'],
+  { revalidate: 300, tags: [DISPLAY_CONTENT_TAG] },
+);
 
 export async function getMediaById(id: string) {
   return db.query.media.findFirst({
