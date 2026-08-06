@@ -190,7 +190,11 @@ export function Player({ displayId }: PlayerProps) {
         const res = await fetch(`/api/display/${displayId}`, { cache: 'no-store' });
         if (!res.ok) return;
         const data = (await res.json()) as ApiResponse;
-        if (!data?.slides) return;
+        // An empty slide list from a healthy response means "this display
+        // has nothing scheduled" — but adopting it (and caching it) during
+        // a server-side hiccup would blank a working screen. Keep playing
+        // what we have; a genuinely emptied display gets fixed on reload.
+        if (!data?.slides || data.slides.length === 0) return;
         // Orientation can change live if the admin flips a display; update
         // immediately so subsequent renders use the new aspect / templates.
         if (data.orientation !== orientation) setOrientation(data.orientation);
@@ -289,38 +293,25 @@ export function Player({ displayId }: PlayerProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Heartbeat — tell the admin what's currently on screen. Fires on every
-  // slide change AND every 60s as a liveness ping (so an idle TV stuck on
-  // the same slide still reads as "online" in the admin).
+  // Heartbeat — tell the admin this display is alive and what's on screen.
+  // One beat on load, then every 5 minutes. This used to fire on EVERY
+  // slide change (a DB write per ~15s per display, 24/7) which kept Neon
+  // compute — and its bill — running around the clock. The current slide id
+  // is read from a ref so the interval reports fresh state without
+  // re-arming on each rotation.
+  const currentSlideIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!ready || pool.length === 0) return;
-    const current = pool[currentIndex];
-    if (!current) return;
+    currentSlideIdRef.current = pool[currentIndex]?.id ?? null;
+  }, [currentIndex, pool]);
 
-    const payload = JSON.stringify({ slideId: current.id });
+  useEffect(() => {
+    if (!ready) return;
     const url = `/api/display/${displayId}/heartbeat`;
 
-    // Use sendBeacon when available — it survives page navigation/unload
-    // and doesn't block. Fall back to fetch.
-    try {
-      if (navigator.sendBeacon) {
-        const blob = new Blob([payload], { type: 'application/json' });
-        navigator.sendBeacon(url, blob);
-      } else {
-        fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: payload,
-          keepalive: true,
-        }).catch(() => {
-          /* network blip — next slide change will retry */
-        });
-      }
-    } catch {
-      /* sendBeacon can throw on some Tizen builds — swallow */
-    }
-
-    const ping = setInterval(() => {
+    const beat = () => {
+      const payload = JSON.stringify({ slideId: currentSlideIdRef.current });
+      // Use sendBeacon when available — it survives page navigation/unload
+      // and doesn't block. Fall back to fetch.
       try {
         if (navigator.sendBeacon) {
           const blob = new Blob([payload], { type: 'application/json' });
@@ -331,14 +322,19 @@ export function Player({ displayId }: PlayerProps) {
             headers: { 'Content-Type': 'application/json' },
             body: payload,
             keepalive: true,
-          }).catch(() => {});
+          }).catch(() => {
+            /* network blip — next ping will retry */
+          });
         }
       } catch {
-        /* swallow */
+        /* sendBeacon can throw on some Tizen builds — swallow */
       }
-    }, 60_000);
+    };
+
+    beat();
+    const ping = setInterval(beat, 300_000);
     return () => clearInterval(ping);
-  }, [currentIndex, pool, ready, displayId]);
+  }, [ready, displayId]);
 
   const handleSlideDone = useCallback(() => {
     setCurrentIndex((prev) => {
