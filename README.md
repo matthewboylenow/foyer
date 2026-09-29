@@ -100,6 +100,19 @@ On the Vercel Hobby plan crons only run daily; point any external pinger
 (UptimeKuma, a Pi cron) at `/api/cron/display-check` with
 `Authorization: Bearer $CRON_SECRET` every 5 minutes instead.
 
+## Weekly email import (paste-in)
+
+**Admin → Email import.** Paste the sent HubSpot email's source (or its plain
+text). `lib/import/html-to-text.ts` strips the layout and Claude
+(`lib/import/parse-email.ts`, structured output) splits it into one slide per
+announcement with the copy preserved word for word: heading = the section
+heading, subtitle = date · time · place, body paragraphs as written, and the
+call-to-action sentence on its own line (also encoded as a QR code when it has
+a link). You review each proposal with a live preview, untick what shouldn't
+run, and create them in a new "Email blast · <date>" collection; last week's
+email slides are turned off in the same step. Needs `ANTHROPIC_API_KEY` on the
+server. Headlines render at the small size only; the size picker is gone.
+
 ## Takeover, QR codes, posters, event dates
 
 - **Takeover** (a switch in the slide editor, `slides.priority`): while any

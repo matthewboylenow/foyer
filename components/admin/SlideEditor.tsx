@@ -18,14 +18,13 @@ import { LivePreview } from './LivePreview';
 import { ImageUpload } from './ImageUpload';
 import { VideoUpload } from './VideoUpload';
 import { StyleSection } from './StyleSection';
-import { SizeButtons } from './SizeButtons';
 import { PercentageSlider } from './PercentageSlider';
 import { RichTextEditor } from './RichTextEditor';
 import { resolveLogoPercent } from '@/components/templates/sizing';
 import { templates } from '@/components/templates';
 import type { TemplateKey } from '@/components/templates';
 import { CollectionPicker } from './CollectionPicker';
-import type { SlideWithContent, SlideContent, MassScheduleRow, SizePreset, TextMode, Collection, SlideOrientation } from '@/lib/db/schema';
+import type { SlideWithContent, SlideContent, MassScheduleRow, TextMode, Collection, SlideOrientation } from '@/lib/db/schema';
 import { dateToTimeValue, type TimeValue } from '@/lib/time';
 
 type OrientationMedia = {
@@ -833,11 +832,6 @@ function TemplateFields({
             <Label>Headline</Label>
             <Input value={c.headline} onChange={(e) => set('headline', e.target.value)} placeholder="Saint Helen Parish" />
           </div>
-          <SizeButtons
-            label="Headline size"
-            value={c.headlineSize}
-            onChange={(v: SizePreset) => set('headlineSize', v)}
-          />
           <div className="space-y-1">
             <Label>Tagline (optional)</Label>
             <RichTextEditor
@@ -918,11 +912,6 @@ function TemplateFields({
             <Label>Quote</Label>
             <Textarea rows={4} value={c.quote} onChange={(e) => set('quote', e.target.value)} placeholder="Come to me, all you who are weary…" />
           </div>
-          <SizeButtons
-            label="Quote size"
-            value={c.quoteSize}
-            onChange={(v: SizePreset) => set('quoteSize', v)}
-          />
           <div className="space-y-1">
             <Label>Attribution (optional)</Label>
             <Input value={c.attribution ?? ''} onChange={(e) => set('attribution', e.target.value)} placeholder="Matthew 11:28" />
@@ -953,11 +942,6 @@ function TemplateFields({
             <Label>Headline</Label>
             <Input value={c.headline} onChange={(e) => set('headline', e.target.value)} placeholder="Event or announcement title" />
           </div>
-          <SizeButtons
-            label="Headline size"
-            value={c.headlineSize}
-            onChange={(v: SizePreset) => set('headlineSize', v)}
-          />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Event date</Label>
@@ -1151,11 +1135,6 @@ function TemplateFields({
               if (first) set('name', first.name);
             }}
           />
-          <SizeButtons
-            label="Name size"
-            value={c.nameSize}
-            onChange={(v: SizePreset) => set('nameSize', v)}
-          />
           <div className="flex items-center gap-3">
             <Switch
               checked={c.inMemoryOf ?? true}
@@ -1186,11 +1165,6 @@ function TemplateFields({
             <Label>Headline</Label>
             <Input value={c.headline} onChange={(e) => set('headline', e.target.value)} />
           </div>
-          <SizeButtons
-            label="Headline size"
-            value={c.headlineSize}
-            onChange={(v: SizePreset) => set('headlineSize', v)}
-          />
           <div className="space-y-1">
             <Label>Body</Label>
             <Textarea rows={3} value={c.body} onChange={(e) => set('body', e.target.value)} />

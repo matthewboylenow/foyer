@@ -65,8 +65,11 @@ export const SANCTUARY_CANDLE_NAME_SIZE: Record<SizePreset, number> = {
 
 export function resolveSize<T extends Record<SizePreset, number>>(
   map: T,
-  size: SizePreset | undefined,
+  _size: SizePreset | undefined,
 ): number {
-  // Default to 'large' (original spec size) when no preset has been chosen.
-  return map[size ?? 'large'];
+  // Every headline renders at the 'small' step. The medium/large presets
+  // were never used in practice and the picker is gone from the editor;
+  // the stored value is ignored so old slides match new ones.
+  void _size;
+  return map.small;
 }
