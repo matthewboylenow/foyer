@@ -60,6 +60,7 @@ export default async function PreviewPage({
   let bgImageUrl: string | null = null;
   let bgVideoUrl: string | null = null;
   let phoneMockupUrl: string | null = null;
+  let imageUrl: string | null = null;
 
   if (slide.templateType === 'parish_identity') {
     const slideLogoId =
@@ -83,6 +84,10 @@ export default async function PreviewPage({
     const m = await getMediaById(effectiveContent.phoneMockupMediaId);
     phoneMockupUrl = m?.blobUrl ?? null;
   }
+  if (typeof effectiveContent.imageMediaId === 'string') {
+    const m = await getMediaById(effectiveContent.imageMediaId);
+    imageUrl = m?.blobUrl ?? null;
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const SlideComponent = templateConfig.component as React.ComponentType<any>;
@@ -97,6 +102,7 @@ export default async function PreviewPage({
           bgImageUrl={bgImageUrl ?? undefined}
           bgVideoUrl={bgVideoUrl ?? undefined}
           phoneMockupUrl={phoneMockupUrl ?? undefined}
+          imageUrl={imageUrl ?? undefined}
         />
       </div>
     </TenantTheme>

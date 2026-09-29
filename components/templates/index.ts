@@ -5,8 +5,9 @@ import { MassSchedule } from './MassSchedule';
 import { WeeklyAssociation } from './WeeklyAssociation';
 import { SanctuaryCandle } from './SanctuaryCandle';
 import { AppPromo } from './AppPromo';
+import { Poster } from './Poster';
 
-export { ParishIdentity, WelcomeQuote, General, MassSchedule, WeeklyAssociation, SanctuaryCandle, AppPromo };
+export { ParishIdentity, WelcomeQuote, General, MassSchedule, WeeklyAssociation, SanctuaryCandle, AppPromo, Poster };
 
 export const templates = {
   parish_identity: {
@@ -57,6 +58,13 @@ export const templates = {
     defaultWeight: 0.5,
     label: 'App Promo',
     description: 'Your Parish in Your Pocket — promotes the parish mobile app.',
+  },
+  poster: {
+    component: Poster,
+    defaultDurationSec: 15,
+    defaultWeight: 1.0,
+    label: 'Poster / Flyer',
+    description: 'A finished flyer, full screen, with an optional caption and QR code.',
   },
 } as const;
 

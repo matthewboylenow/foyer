@@ -100,6 +100,20 @@ On the Vercel Hobby plan crons only run daily; point any external pinger
 (UptimeKuma, a Pi cron) at `/api/cron/display-check` with
 `Authorization: Bearer $CRON_SECRET` every 5 minutes instead.
 
+## Takeover, QR codes, posters, event dates
+
+- **Takeover** (a switch in the slide editor, `slides.priority`): while any
+  eligible slide has it on, every TV shows only takeover slides. This is the
+  emergency/funeral/closure override that OptiSigns used to provide. Combine
+  with a dated schedule so it turns itself off.
+- **QR codes**: the General and Poster templates take a sign-up link and
+  render it as a scannable code with a caption (`components/templates/QrBadge.tsx`).
+- **Poster / Flyer** template: a finished flyer full-screen, whole image over
+  a blurred copy of itself (or cropped to fill), optional caption and QR.
+- **Event date** on General slides: shown as "Sunday, October 12" when the
+  free-text line is empty, and a one-click "turn off the morning after the
+  event" sets the end date for you.
+
 ## Brand and Voice
 
 This app does not generate content. The brand voice (warm, personal, Saint Helen) is enforced by the content authored in the admin, not by the templates. The templates enforce the visual brand: navy, rust, cream, gold, Libre Baskerville and Libre Franklin.

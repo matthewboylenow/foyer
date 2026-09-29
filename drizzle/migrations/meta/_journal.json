@@ -64,6 +64,13 @@
       "when": 1790641856224,
       "tag": "0008_v20_fleet_monitoring",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790643947774,
+      "tag": "0009_v21_priority_poster_qr",
+      "breakpoints": true
     }
   ]
 }

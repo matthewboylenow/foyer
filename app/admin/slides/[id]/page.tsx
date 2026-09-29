@@ -22,22 +22,31 @@ export default async function EditSlidePage({
 
   async function resolveContentMedia(content: unknown) {
     const c = (content ?? {}) as Record<string, unknown>;
-    const ids: Record<'logo' | 'bg' | 'bgVideo' | 'phone', string | null> = {
+    const ids: Record<'logo' | 'bg' | 'bgVideo' | 'phone' | 'image', string | null> = {
       logo: typeof c.logoMediaId === 'string' ? c.logoMediaId : null,
       bg: typeof c.bgImageMediaId === 'string' ? c.bgImageMediaId : null,
       bgVideo: typeof c.bgVideoMediaId === 'string' ? c.bgVideoMediaId : null,
       phone: typeof c.phoneMockupMediaId === 'string' ? c.phoneMockupMediaId : null,
+      image: typeof c.imageMediaId === 'string' ? c.imageMediaId : null,
     };
-    const out: { logoUrl: string | null; bgImageUrl: string | null; bgVideoUrl: string | null; phoneMockupUrl: string | null } = {
+    const out: {
+      logoUrl: string | null;
+      bgImageUrl: string | null;
+      bgVideoUrl: string | null;
+      phoneMockupUrl: string | null;
+      imageUrl: string | null;
+    } = {
       logoUrl: null,
       bgImageUrl: null,
       bgVideoUrl: null,
       phoneMockupUrl: null,
+      imageUrl: null,
     };
     if (ids.logo) out.logoUrl = (await getMediaById(ids.logo))?.blobUrl ?? null;
     if (ids.bg) out.bgImageUrl = (await getMediaById(ids.bg))?.blobUrl ?? null;
     if (ids.bgVideo) out.bgVideoUrl = (await getMediaById(ids.bgVideo))?.blobUrl ?? null;
     if (ids.phone) out.phoneMockupUrl = (await getMediaById(ids.phone))?.blobUrl ?? null;
+    if (ids.image) out.imageUrl = (await getMediaById(ids.image))?.blobUrl ?? null;
     return out;
   }
 

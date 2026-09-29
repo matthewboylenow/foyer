@@ -33,6 +33,7 @@ type OrientationMedia = {
   bgImageUrl?: string | null;
   bgVideoUrl?: string | null;
   phoneMockupUrl?: string | null;
+  imageUrl?: string | null;
 };
 
 interface SlideEditorProps {
@@ -90,7 +91,17 @@ function defaultContent(templateType: TemplateKey): SlideContent {
       return { templateType, name: '', inMemoryOf: true };
     case 'app_promo':
       return { templateType, headline: 'Your Parish in Your Pocket', body: 'Mass readings. Livestreams. All in one app.', url: 'sainthelen.org/app' };
+    case 'poster':
+      return { templateType, fit: 'contain', caption: '' };
   }
+}
+
+/** YYYY-MM-DD → the next day, same format (local parts, no UTC drift). */
+function dayAfter(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map((n) => parseInt(n, 10));
+  const next = new Date(y, m - 1, d + 1);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`;
 }
 
 export function SlideEditor({
@@ -159,6 +170,7 @@ export function SlideEditor({
     initialSlide?.durationOverrideSec ? String(initialSlide.durationOverrideSec) : '',
   );
   const [active, setActive] = useState(initialSlide?.active ?? true);
+  const [priority, setPriority] = useState(initialSlide?.priority ?? false);
   const [targetDisplays, setTargetDisplays] = useState<string[]>(
     (initialSlide?.targetDisplays as string[]) ?? [],
   );
@@ -173,12 +185,14 @@ export function SlideEditor({
     bgImageUrl: initialMedia?.portrait?.bgImageUrl ?? null,
     bgVideoUrl: initialMedia?.portrait?.bgVideoUrl ?? null,
     phoneMockupUrl: initialMedia?.portrait?.phoneMockupUrl ?? null,
+    imageUrl: initialMedia?.portrait?.imageUrl ?? null,
   });
   const [landscapeMedia, setLandscapeMedia] = useState<OrientationMedia>({
     logoUrl: initialMedia?.landscape?.logoUrl ?? null,
     bgImageUrl: initialMedia?.landscape?.bgImageUrl ?? null,
     bgVideoUrl: initialMedia?.landscape?.bgVideoUrl ?? null,
     phoneMockupUrl: initialMedia?.landscape?.phoneMockupUrl ?? null,
+    imageUrl: initialMedia?.landscape?.imageUrl ?? null,
   });
 
   // Active-tab proxies — let the form below read/write a single content
@@ -204,6 +218,7 @@ export function SlideEditor({
       contentLandscape: landscapeHas ? landscapeContent : null,
       scheduleType,
       active,
+      priority,
       weight: parseFloat(weight) || 1,
       durationOverrideSec: durationOverride ? parseInt(durationOverride) : null,
       targetDisplays,
@@ -372,6 +387,15 @@ export function SlideEditor({
               onPhoneMockupChange={(url) => updateActiveMedia({ phoneMockupUrl: url })}
               slideLogoUrl={activeMedia.logoUrl ?? null}
               onSlideLogoChange={(url) => updateActiveMedia({ logoUrl: url })}
+              imageUrl={activeMedia.imageUrl ?? null}
+              onImageChange={(url) => updateActiveMedia({ imageUrl: url })}
+              onExpireAfter={(ymd) => {
+                setScheduleType('dated');
+                setEndDate(dayAfter(ymd));
+                setEndTime({ hour: 6, minute: 0, period: 'AM' });
+                toast.success(`Will turn off the morning after ${ymd}`);
+              }}
+              scheduleEndDate={scheduleType === 'dated' ? endDate : ''}
             />
           ) : (
             <EmptyOrientationCallout
@@ -432,6 +456,7 @@ export function SlideEditor({
                 bgImageUrl={activeMedia.bgImageUrl ?? null}
                 bgVideoUrl={activeMedia.bgVideoUrl ?? null}
                 phoneMockupUrl={activeMedia.phoneMockupUrl ?? null}
+                imageUrl={activeMedia.imageUrl ?? null}
                 width={activeOrientation === 'portrait' ? 280 : 380}
               />
             ) : (
@@ -462,6 +487,19 @@ export function SlideEditor({
               </div>
             </div>
           )}
+
+          {/* Takeover */}
+          <div className={`p-4 border rounded-lg space-y-2 ${priority ? 'border-rust bg-rust/5' : 'border-border'}`}>
+            <div className="flex items-center gap-3">
+              <Switch checked={priority} onCheckedChange={setPriority} />
+              <Label className={priority ? 'text-rust font-semibold' : ''}>Takeover</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              While this slide is on (and within its dates), the TVs show only takeover
+              slides — nothing else. For a funeral notice, a weather closure, an emergency
+              message. Turn it off to resume the normal rotation.
+            </p>
+          </div>
 
           {/* Schedule type */}
           <div className="p-4 border border-border rounded-lg space-y-4">
@@ -757,6 +795,12 @@ interface TemplateFieldsProps {
   onPhoneMockupChange: (url: string | null) => void;
   slideLogoUrl: string | null;
   onSlideLogoChange: (url: string | null) => void;
+  imageUrl: string | null;
+  onImageChange: (url: string | null) => void;
+  /** Sets the schedule to end the morning after the given YYYY-MM-DD. */
+  onExpireAfter: (ymd: string) => void;
+  /** Current end date when the schedule is dated (for the helper's label). */
+  scheduleEndDate: string;
 }
 
 function TemplateFields({
@@ -771,6 +815,10 @@ function TemplateFields({
   onPhoneMockupChange,
   slideLogoUrl,
   onSlideLogoChange,
+  imageUrl,
+  onImageChange,
+  onExpireAfter,
+  scheduleEndDate,
 }: TemplateFieldsProps) {
   function set(key: string, value: unknown) {
     onChange({ ...content, [key]: value } as SlideContent);
@@ -910,9 +958,35 @@ function TemplateFields({
             value={c.headlineSize}
             onChange={(v: SizePreset) => set('headlineSize', v)}
           />
-          <div className="space-y-1">
-            <Label>Date, time &amp; location (shown between the headline and body)</Label>
-            <Input value={c.meta ?? ''} onChange={(e) => set('meta', e.target.value)} placeholder="Sunday, October 12 at 7 PM in Meaney Hall" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Event date</Label>
+              <Input
+                type="date"
+                value={c.eventDate ?? ''}
+                onChange={(e) => set('eventDate', e.target.value || undefined)}
+              />
+              {c.eventDate ? (
+                <button
+                  type="button"
+                  onClick={() => onExpireAfter(c.eventDate!)}
+                  className="text-xs text-rust hover:underline"
+                >
+                  {scheduleEndDate === dayAfter(c.eventDate)
+                    ? 'Turns off the morning after ✓'
+                    : 'Turn off the morning after the event'}
+                </button>
+              ) : (
+                <p className="text-xs text-muted-foreground">Optional. Lets the slide expire itself.</p>
+              )}
+            </div>
+            <div className="space-y-1">
+              <Label>Date, time &amp; location line</Label>
+              <Input value={c.meta ?? ''} onChange={(e) => set('meta', e.target.value)} placeholder="Sunday, October 12 at 7 PM in Meaney Hall" />
+              <p className="text-xs text-muted-foreground">
+                Leave blank to show the event date as “Sunday, October 12”.
+              </p>
+            </div>
           </div>
           <div className="space-y-1">
             <Label>Body</Label>
@@ -926,6 +1000,16 @@ function TemplateFields({
             <p className="text-xs text-muted-foreground">
               Bold, italic, and bullet lists supported. Press Enter for paragraphs, Shift+Enter for line breaks.
             </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Sign-up link (shown as a QR code)</Label>
+              <Input value={c.qrUrl ?? ''} onChange={(e) => set('qrUrl', e.target.value)} placeholder="sainthelen.org/lifelines" />
+            </div>
+            <div className="space-y-1">
+              <Label>QR caption</Label>
+              <Input value={c.qrLabel ?? ''} onChange={(e) => set('qrLabel', e.target.value)} placeholder="Scan to sign up" />
+            </div>
           </div>
           <div className="space-y-1">
             <Label>Headline animation</Label>
@@ -1139,6 +1223,52 @@ function TemplateFields({
               onBgImageChange(null);
             }}
           />
+        </div>
+      );
+    }
+
+    case 'poster': {
+      const c = content as Extract<SlideContent, { templateType: 'poster' }>;
+      return (
+        <div className="space-y-4">
+          <ImageUpload
+            label="Flyer image (PNG or JPG, portrait works best)"
+            type="image"
+            currentUrl={imageUrl}
+            onUploaded={({ id, blobUrl }) => {
+              set('imageMediaId', id);
+              onImageChange(blobUrl);
+            }}
+            onCleared={() => {
+              set('imageMediaId', undefined);
+              onImageChange(null);
+            }}
+          />
+          <div className="space-y-1">
+            <Label>How to fit the screen</Label>
+            <select
+              value={c.fit ?? 'contain'}
+              onChange={(e) => set('fit', e.target.value)}
+              className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+            >
+              <option value="contain">Show the whole flyer (blurred edges fill the gaps)</option>
+              <option value="cover">Fill the screen (crops the edges)</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <Label>Caption (optional)</Label>
+            <Input value={c.caption ?? ''} onChange={(e) => set('caption', e.target.value)} placeholder="Saturday, October 18 · Meaney Hall" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Sign-up link (shown as a QR code)</Label>
+              <Input value={c.qrUrl ?? ''} onChange={(e) => set('qrUrl', e.target.value)} placeholder="sainthelen.org/fest" />
+            </div>
+            <div className="space-y-1">
+              <Label>QR caption</Label>
+              <Input value={c.qrLabel ?? ''} onChange={(e) => set('qrLabel', e.target.value)} placeholder="Scan to sign up" />
+            </div>
+          </div>
         </div>
       );
     }

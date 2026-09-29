@@ -23,6 +23,7 @@ type PlayerSlide = {
   active: boolean;
   weight: number;
   durationOverrideSec: number | null;
+  priority?: boolean;
   collectionId: string | null;
   displayOrder: number;
   createdAt: string | Date;
@@ -90,6 +91,7 @@ const FALLBACK_SLIDE: PlayerSlide = {
   active: true,
   weight: 1,
   durationOverrideSec: null,
+  priority: false,
   displayOrder: 0,
   collectionId: null,
   createdAt: new Date(),
@@ -275,7 +277,7 @@ export function Player({ displayId }: PlayerProps) {
 
     // Logos / mockups render as plain <img> in their templates, so the raw
     // URL is the right one to warm.
-    for (const url of [next?.resolvedMedia?.logoUrl, next?.resolvedMedia?.phoneMockupUrl]) {
+    for (const url of [next?.resolvedMedia?.logoUrl, next?.resolvedMedia?.phoneMockupUrl, next?.resolvedMedia?.imageUrl]) {
       if (url) warm({ src: url });
     }
   }, [currentIndex, pool]);
@@ -440,6 +442,7 @@ export function Player({ displayId }: PlayerProps) {
             bgVideoUrl={resolved.bgVideoUrl}
             bgVideoExternal
             phoneMockupUrl={resolved.phoneMockupUrl}
+            imageUrl={resolved.imageUrl}
           />
         </SlideErrorBoundary>
       </SlideFrame>

@@ -40,7 +40,7 @@ export async function PATCH(
 
   const allowed = [
     'title', 'content', 'contentLandscape', 'scheduleType', 'startAt', 'endAt',
-    'active', 'weight', 'durationOverrideSec', 'targetDisplays',
+    'active', 'priority', 'weight', 'durationOverrideSec', 'targetDisplays',
     'collectionId',
   ];
 

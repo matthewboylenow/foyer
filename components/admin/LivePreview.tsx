@@ -14,6 +14,7 @@ interface LivePreviewProps {
   bgImageUrl?: string | null;
   bgVideoUrl?: string | null;
   phoneMockupUrl?: string | null;
+  imageUrl?: string | null;
   /** Preview pixel width — height auto-scales to the orientation's aspect. */
   width?: number;
 }
@@ -26,6 +27,7 @@ export function LivePreview({
   bgImageUrl,
   bgVideoUrl,
   phoneMockupUrl,
+  imageUrl,
   width = 280,
 }: LivePreviewProps) {
   // Debounce content changes so animations don't replay on every keystroke.
@@ -79,6 +81,7 @@ export function LivePreview({
           bgImageUrl={bgImageUrl ?? undefined}
           bgVideoUrl={bgVideoUrl ?? undefined}
           phoneMockupUrl={phoneMockupUrl ?? undefined}
+          imageUrl={imageUrl ?? undefined}
         />
       </div>
     </div>

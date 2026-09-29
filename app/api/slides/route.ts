@@ -34,6 +34,7 @@ export async function POST(req: Request) {
     durationOverrideSec,
     collectionId,
     targetDisplays,
+    priority,
   } = body;
 
   // A slide must be authored in at least one orientation. Either content is
@@ -65,6 +66,7 @@ export async function POST(req: Request) {
       endAt: endAt ? new Date(endAt) : null,
       active: active ?? true,
       weight: weight ?? 1,
+      priority: priority === true,
       durationOverrideSec: durationOverrideSec ?? null,
       collectionId: collectionId ?? null,
       targetDisplays: targetDisplays ?? [],

@@ -15,6 +15,7 @@ const TEMPLATE_COLORS: Record<TemplateKey, { bg: string; fg: string }> = {
   weekly_association: { bg: '#FAF9F7', fg: '#1F346D' },
   sanctuary_candle: { bg: '#0B0D12', fg: '#D4AF37' },
   app_promo: { bg: '#16264E', fg: '#FAF9F7' },
+  poster: { bg: '#0B0D12', fg: '#D4AF37' },
 };
 
 export default function NewSlidePage() {

@@ -440,6 +440,7 @@ function DisplayCard({
                   bgImageUrl={currentSlide.resolvedMedia?.bgImageUrl}
                   bgVideoUrl={currentSlide.resolvedMedia?.bgVideoUrl}
                   phoneMockupUrl={currentSlide.resolvedMedia?.phoneMockupUrl}
+                  imageUrl={currentSlide.resolvedMedia?.imageUrl}
                 />
               </div>
             ) : (

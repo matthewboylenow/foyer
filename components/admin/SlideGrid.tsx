@@ -313,6 +313,19 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
 
   return (
     <div className="space-y-6">
+      {/* Takeover banner — whichever slides are priority are the only ones on screen. */}
+      {slides.some((s) => s.active && s.priority) && (
+        <div className="rounded-lg border border-rust/40 bg-rust/5 px-4 py-2.5 text-sm text-navy flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded bg-rust text-cream">
+            Takeover on
+          </span>
+          <span>
+            {slides.filter((s) => s.active && s.priority).map((s) => s.title || 'Untitled').join(', ')}
+            {' '}— the TVs show only these until the takeover is turned off or expires.
+          </span>
+        </div>
+      )}
+
       {/* Filter + search row */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex gap-1.5 p-1 rounded-lg bg-navy/5 border border-navy/10">

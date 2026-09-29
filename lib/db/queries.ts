@@ -60,7 +60,7 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
   // with empty content for this display's orientation is filtered out —
   // marked portrait-only doesn't run on a landscape screen and vice versa.
   type SlidePicked = (typeof eligible)[number] & { _effective: SlideContent };
-  const filtered: SlidePicked[] = [];
+  let filtered: SlidePicked[] = [];
   for (const s of eligible) {
     const targets = (s.targetDisplays as string[]) ?? [];
     if (targets.length > 0 && !targets.includes(displayId)) continue;
@@ -68,6 +68,11 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
     if (!available || !effective) continue;
     filtered.push({ ...s, _effective: effective });
   }
+
+  // Takeover: if any eligible slide is marked priority, the screen shows
+  // only priority slides until none are left (turned off or expired).
+  const takeover = filtered.filter((s) => s.priority);
+  if (takeover.length > 0) filtered = takeover;
 
   // Resolve media references — gather all media IDs from the EFFECTIVE
   // (orientation-resolved) content, look them up, attach URLs.
@@ -83,6 +88,7 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
     if (typeof c?.bgImageMediaId === 'string') mediaIds.add(c.bgImageMediaId);
     if (typeof c?.bgVideoMediaId === 'string') mediaIds.add(c.bgVideoMediaId);
     if (typeof c?.phoneMockupMediaId === 'string') mediaIds.add(c.phoneMockupMediaId);
+    if (typeof c?.imageMediaId === 'string') mediaIds.add(c.imageMediaId);
   }
 
   const mediaRows = mediaIds.size > 0
@@ -113,6 +119,10 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
     if (typeof c?.phoneMockupMediaId === 'string') {
       const url = mediaMap.get(c.phoneMockupMediaId);
       if (url) resolved.phoneMockupUrl = url;
+    }
+    if (typeof c?.imageMediaId === 'string') {
+      const url = mediaMap.get(c.imageMediaId);
+      if (url) resolved.imageUrl = url;
     }
     // Strip contentLandscape from the returned shape and replace content
     // with the orientation-resolved effective content.
@@ -155,6 +165,7 @@ function collectContentMediaIds(content: unknown, sink: Set<string>) {
   if (typeof c.bgImageMediaId === 'string') sink.add(c.bgImageMediaId);
   if (typeof c.bgVideoMediaId === 'string') sink.add(c.bgVideoMediaId);
   if (typeof c.phoneMockupMediaId === 'string') sink.add(c.phoneMockupMediaId);
+  if (typeof c.imageMediaId === 'string') sink.add(c.imageMediaId);
 }
 
 /**
@@ -191,6 +202,10 @@ function resolveContentMedia(
   if (typeof c.phoneMockupMediaId === 'string') {
     const url = mediaMap.get(c.phoneMockupMediaId);
     if (url) resolved.phoneMockupUrl = url;
+  }
+  if (typeof c.imageMediaId === 'string') {
+    const url = mediaMap.get(c.imageMediaId);
+    if (url) resolved.imageUrl = url;
   }
   return resolved;
 }
@@ -300,7 +315,8 @@ export async function getSlidesReferencingMedia(tenantId: string, mediaId: strin
       c.logoMediaId === mediaId ||
       c.bgImageMediaId === mediaId ||
       c.bgVideoMediaId === mediaId ||
-      c.phoneMockupMediaId === mediaId
+      c.phoneMockupMediaId === mediaId ||
+      c.imageMediaId === mediaId
     );
   });
 }

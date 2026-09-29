@@ -94,6 +94,7 @@ export async function GET() {
       if (typeof c.bgImageMediaId === 'string') mediaIds.add(c.bgImageMediaId);
       if (typeof c.bgVideoMediaId === 'string') mediaIds.add(c.bgVideoMediaId);
       if (typeof c.phoneMockupMediaId === 'string') mediaIds.add(c.phoneMockupMediaId);
+      if (typeof c.imageMediaId === 'string') mediaIds.add(c.imageMediaId);
     }
   }
   const mediaRows = mediaIds.size
@@ -144,6 +145,7 @@ export async function GET() {
         ['bgImageMediaId', 'bgImageUrl'],
         ['bgVideoMediaId', 'bgVideoUrl'],
         ['phoneMockupMediaId', 'phoneMockupUrl'],
+        ['imageMediaId', 'imageUrl'],
       ] as const) {
         if (typeof c?.[key] === 'string') {
           const url = mediaMap.get(c[key] as string);

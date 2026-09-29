@@ -174,6 +174,7 @@ export function SlideCard({
               bgImageUrl={resolved.bgImageUrl}
               bgVideoUrl={resolved.bgVideoUrl}
               phoneMockupUrl={resolved.phoneMockupUrl}
+              imageUrl={resolved.imageUrl}
             />
           </div>
         )}
@@ -247,6 +248,11 @@ export function SlideCard({
 
         <div className="flex items-center gap-2 mt-2 text-[11px] text-navy/55">
           <Calendar size={11} className="shrink-0" />
+          {slide.priority && (
+            <span className="shrink-0 text-[9px] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded bg-rust text-cream">
+              Takeover
+            </span>
+          )}
           <span className="truncate">{scheduleLabel}</span>
           <TimeAgo
             date={slide.updatedAt}

@@ -9,6 +9,7 @@ import { AutoFitText } from './AutoFitText';
 import { GENERAL_HEADLINE_SIZE, resolveSize } from './sizing';
 import { palette } from './style';
 import { BgLayer } from './BgLayer';
+import { QrBadge } from './QrBadge';
 import type { GeneralContent, SlideOrientation } from '@/lib/db/schema';
 
 interface GeneralProps {
@@ -17,12 +18,25 @@ interface GeneralProps {
   bgImageUrl?: string;
 }
 
+/** "Sunday, October 12" from a YYYY-MM-DD string, parsed as local parts
+ *  (never via new Date(string), which reads as UTC and shifts a day). */
+export function formatEventDate(ymd: string | undefined): string {
+  if (!ymd || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return '';
+  const [y, m, d] = ymd.split('-').map((n) => parseInt(n, 10));
+  const date = new Date(y, m - 1, d);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
 export function General({ content, orientation = 'portrait', bgImageUrl }: GeneralProps) {
-  const { headline, body, meta, headlineSize, motionStyle = 'lineMask', textMode } = content;
+  const { headline, body, headlineSize, motionStyle = 'lineMask', textMode, eventDate, qrUrl, qrLabel } = content;
+  // Free-text meta wins; otherwise a structured event date renders as a line.
+  const meta = content.meta?.trim() || formatEventDate(eventDate);
   const headlinePx = resolveSize(GENERAL_HEADLINE_SIZE, headlineSize);
   const p = palette(textMode ?? 'dark');
   const isLandscape = orientation === 'landscape';
   const padding = isLandscape ? '80px 160px' : '120px 80px';
+  const hasQr = !!qrUrl?.trim();
 
   return (
     <div className={`relative w-full h-full overflow-hidden ${p.pageBg}`}>
@@ -85,6 +99,13 @@ export function General({ content, orientation = 'portrait', bgImageUrl }: Gener
               className={`font-sans leading-relaxed [&_p]:m-0 [&_p+p]:mt-4 [&_ul]:list-disc [&_ul]:pl-8 [&_li]:mt-1 [&_strong]:font-semibold [&_em]:italic ${p.primary}`}
             />
           </BlurIn>
+        )}
+
+        {/* QR footer — takes its own row so the body shrinks to fit above it. */}
+        {hasQr && (
+          <div className={`flex ${isLandscape ? 'justify-end' : 'justify-start'} shrink-0`} style={{ paddingTop: 48 }}>
+            <QrBadge url={qrUrl!} label={qrLabel || 'Scan to sign up'} size={isLandscape ? 200 : 240} />
+          </div>
         )}
       </div>
     </div>

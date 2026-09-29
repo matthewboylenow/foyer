@@ -20,6 +20,7 @@ export const slideTemplateEnum = pgEnum('slide_template', [
   'weekly_association',
   'sanctuary_candle',
   'app_promo',
+  'poster',
 ]);
 
 export const scheduleTypeEnum = pgEnum('schedule_type', [
@@ -192,6 +193,11 @@ export const slides = pgTable('slides', {
   endAt: timestamp('end_at', { withTimezone: true }),
   targetDisplays: jsonb('target_displays').default([]).notNull(),
   active: boolean('active').default(true).notNull(),
+  /** Takeover. While any eligible slide has priority, the player shows only
+   *  priority slides — for a funeral notice, a weather closure, an
+   *  emergency message. Turn it off (or let its end date pass) and the
+   *  normal rotation resumes on the next heartbeat. */
+  priority: boolean('priority').default(false).notNull(),
   weight: integer('weight').default(1).notNull(),
   durationOverrideSec: integer('duration_override_sec'),
   /** Optional collection membership. ON DELETE SET NULL: deleting a
@@ -347,9 +353,32 @@ export type GeneralContent = {
   headlineSize?: SizePreset;       // default: 'large' (= original spec size)
   body: string;                     // HTML from RichTextEditor
   meta?: string;
+  /** The event's date (YYYY-MM-DD). Drives the auto-expire option in the
+   *  editor and, when `meta` is empty, a formatted date line. */
+  eventDate?: string;
+  /** Sign-up / more-info link rendered as a QR code in the corner. */
+  qrUrl?: string;
+  /** Caption under the QR, default "Scan to sign up". */
+  qrLabel?: string;
   bgImageMediaId?: string;
   motionStyle?: 'splitReveal' | 'lineMask';
   textMode?: TextMode;
+};
+
+/**
+ * Full-bleed flyer. The image IS the slide: contain-fit on a blurred copy
+ * of itself so a letter-size flyer on a 9:16 screen has no hard black
+ * bars. Optional caption strip and QR.
+ */
+export type PosterContent = {
+  templateType: 'poster';
+  /** The flyer image (required for the slide to show anything). */
+  imageMediaId?: string;
+  /** 'contain' (default) shows the whole flyer; 'cover' crops to fill. */
+  fit?: 'contain' | 'cover';
+  caption?: string;
+  qrUrl?: string;
+  qrLabel?: string;
 };
 
 export type MassScheduleRow = {
@@ -410,7 +439,8 @@ export type SlideContent =
   | MassScheduleContent
   | WeeklyAssociationContent
   | SanctuaryCandleContent
-  | AppPromoContent;
+  | AppPromoContent
+  | PosterContent;
 
 /** Vitals the Raspberry Pi agent reports on every check-in. Every field is
  *  optional — older agents or non-Pi hardware may send a subset. */
