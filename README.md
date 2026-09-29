@@ -65,8 +65,10 @@ Any browser pointed at `/display/<id>` is a player, so OptiSigns keeps working
 unchanged. To run a screen without a subscription, use a Raspberry Pi 4/5 with
 the official power supply and a fan case (~$100 one time):
 
-1. Flash **Raspberry Pi OS (64-bit) with desktop** using Raspberry Pi Imager
-   (set a user, Wi-Fi and SSH in the imager's settings).
+1. Flash **Raspberry Pi OS Lite (64-bit)** using Raspberry Pi Imager (set a
+   user, Wi-Fi and SSH in the imager's settings). The Desktop edition works
+   too; the installer detects which one it is on. Lite is leaner: the
+   installer adds the labwc compositor and starts it from the console.
 2. Boot it on the TV, open a terminal (or SSH in), and paste the command from
    **Displays → ⋯ → Set up a Raspberry Pi**. It looks like:
 

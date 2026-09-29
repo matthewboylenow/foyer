@@ -3,10 +3,15 @@
 # Foyer kiosk installer for Raspberry Pi
 # ======================================
 #
-# Turns a Raspberry Pi running Raspberry Pi OS (64-bit, Desktop edition,
+# Turns a Raspberry Pi running Raspberry Pi OS 64-bit (Lite or Desktop,
 # Bookworm or newer) into a fullscreen signage player for one Foyer display,
 # and installs the small agent that reports the Pi's health to the Foyer
 # admin and carries out remote reboot / reload / screenshot requests.
+#
+# Raspberry Pi OS Lite is the recommended base: the installer adds the
+# labwc Wayland compositor and starts it straight from the console on tty1
+# (no display manager, no desktop), which boots faster and has less to go
+# wrong. On the Desktop edition it hooks into the existing session instead.
 #
 # Usage (run on the Pi, from the Displays page "Set up a Raspberry Pi"):
 #
@@ -23,12 +28,13 @@
 #   --reboot           Reboot when done
 #
 # What it does:
-#   1. Installs Chromium, wlr-randr, grim, jq, curl.
+#   1. Installs Chromium, wlr-randr, grim, jq, curl (and labwc + seatd on Lite).
 #   2. Writes /etc/foyer/foyer.env with the URL, display id and rotation.
-#   3. Installs /usr/local/bin/foyer-kiosk.sh and hooks it into the desktop
-#      session autostart (labwc, wayfire and X11/LXDE are all covered — only
-#      the active one runs).
-#   4. Sets the Pi to auto-login to the desktop and disables screen blanking.
+#   3. Installs /usr/local/bin/foyer-kiosk.sh and hooks it into the session
+#      autostart (labwc, wayfire and X11/LXDE are all covered — only the
+#      active one runs).
+#   4. Lite: console auto-login on tty1 that execs labwc. Desktop: auto-login
+#      to the desktop. Both: screen blanking off.
 #   5. Installs the agent as a systemd timer (every 60 s).
 #   6. Adds a weekly 4 AM reboot (Mondays) as a belt-and-braces refresh.
 #
@@ -76,6 +82,11 @@ fi
 
 KIOSK_HOME="$(getent passwd "$KIOSK_USER" | cut -d: -f6)"
 say() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
+as_user() { sudo -u "$KIOSK_USER" -H "$@"; }
+
+# Desktop edition ships lightdm; Lite does not. On Lite we bring our own
+# compositor (labwc) and start it from the console.
+if dpkg -s lightdm >/dev/null 2>&1; then EDITION=desktop; else EDITION=lite; fi
 
 # ── 1. Packages ──────────────────────────────────────────────────────────────
 say "Installing packages"
@@ -87,6 +98,13 @@ apt-get install -y -qq --no-install-recommends chromium >/dev/null 2>&1 \
   || apt-get install -y -qq --no-install-recommends chromium-browser >/dev/null
 # X11 fallbacks (harmless if the session is Wayland).
 apt-get install -y -qq --no-install-recommends x11-xserver-utils scrot unclutter >/dev/null 2>&1 || true
+if [[ "$EDITION" == "lite" ]]; then
+  # Minimal Wayland stack: labwc (wlroots compositor — supports wlr-randr
+  # rotation and grim screenshots), seatd for seat/DRM access, a font.
+  apt-get install -y -qq --no-install-recommends labwc seatd fonts-dejavu-core >/dev/null
+  systemctl enable --now seatd >/dev/null 2>&1 || true
+  for g in video render input seat tty; do usermod -aG "$g" "$KIOSK_USER" 2>/dev/null || true; done
+fi
 
 CHROMIUM_BIN="$(command -v chromium || command -v chromium-browser || true)"
 if [[ -z "$CHROMIUM_BIN" ]]; then
@@ -177,8 +195,7 @@ done
 EOF
 chmod 0755 /usr/local/bin/foyer-kiosk.sh
 
-say "Hooking into the desktop session autostart"
-as_user() { sudo -u "$KIOSK_USER" -H "$@"; }
+say "Hooking into the session autostart"
 # labwc (default compositor on current Raspberry Pi OS)
 as_user mkdir -p "$KIOSK_HOME/.config/labwc"
 touch "$KIOSK_HOME/.config/labwc/autostart"
@@ -199,11 +216,59 @@ touch "$LX_AUTOSTART"
 grep -q foyer-kiosk "$LX_AUTOSTART" || echo '@/usr/local/bin/foyer-kiosk.sh' >> "$LX_AUTOSTART"
 chown -R "$KIOSK_USER:$KIOSK_USER" "$KIOSK_HOME/.config"
 
-say "Auto-login to desktop, no screen blanking"
-if command -v raspi-config >/dev/null; then
-  raspi-config nonint do_boot_behaviour B4 >/dev/null 2>&1 || true   # desktop, auto-login
-  raspi-config nonint do_blanking 1 >/dev/null 2>&1 || true          # 1 = disable blanking
-  raspi-config nonint do_boot_splash 0 >/dev/null 2>&1 || true       # splash on (hides boot text)
+if [[ "$EDITION" == "desktop" ]]; then
+  say "Auto-login to desktop, no screen blanking"
+  if command -v raspi-config >/dev/null; then
+    raspi-config nonint do_boot_behaviour B4 >/dev/null 2>&1 || true   # desktop, auto-login
+    raspi-config nonint do_blanking 1 >/dev/null 2>&1 || true          # 1 = disable blanking
+    raspi-config nonint do_boot_splash 0 >/dev/null 2>&1 || true       # splash on (hides boot text)
+  fi
+else
+  say "Console auto-login on tty1; labwc starts the kiosk"
+  if command -v raspi-config >/dev/null; then
+    raspi-config nonint do_boot_behaviour B2 >/dev/null 2>&1 || true   # console, auto-login
+  else
+    install -d /etc/systemd/system/getty@tty1.service.d
+    cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin $KIOSK_USER --noclear %I \$TERM
+EOF
+  fi
+  # When the auto-logged-in shell lands on tty1 with no compositor, exec
+  # labwc. Its autostart file (written above) launches the kiosk.
+  PROFILE_FILE="$KIOSK_HOME/.bash_profile"
+  touch "$PROFILE_FILE"
+  if ! grep -q 'foyer: start labwc' "$PROFILE_FILE"; then
+    cat >> "$PROFILE_FILE" <<'EOF'
+
+# foyer: start labwc on tty1 (kiosk). Remove this block to get a plain shell.
+if [[ -z "$WAYLAND_DISPLAY" && -z "$DISPLAY" && "$(tty)" == "/dev/tty1" ]]; then
+  export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+  exec labwc >/tmp/foyer-labwc.log 2>&1
+fi
+EOF
+  fi
+  chown "$KIOSK_USER:$KIOSK_USER" "$PROFILE_FILE"
+  # No console blanking either.
+  if [[ -f /boot/firmware/cmdline.txt ]] && ! grep -q consoleblank= /boot/firmware/cmdline.txt; then
+    sed -i '1 s/$/ consoleblank=0/' /boot/firmware/cmdline.txt
+  fi
+  # Minimal labwc config: no window decorations, no gaps, fixed position.
+  as_user mkdir -p "$KIOSK_HOME/.config/labwc"
+  if [[ ! -f "$KIOSK_HOME/.config/labwc/rc.xml" ]]; then
+    cat > "$KIOSK_HOME/.config/labwc/rc.xml" <<'EOF'
+<?xml version="1.0"?>
+<labwc_config>
+  <core><decoration>none</decoration><gap>0</gap></core>
+  <theme><cornerRadius>0</cornerRadius></theme>
+  <windowRules>
+    <windowRule identifier="*" serverDecoration="no" fixedPosition="yes" />
+  </windowRules>
+</labwc_config>
+EOF
+    chown "$KIOSK_USER:$KIOSK_USER" "$KIOSK_HOME/.config/labwc/rc.xml"
+  fi
 fi
 
 # Weekly reboot, Monday 4 AM local — keeps memory fresh on a 24/7 box.
@@ -257,7 +322,7 @@ fi
 
 say "Done"
 echo "Kiosk URL: $FOYER_URL/display/$DISPLAY_ID"
-echo "Rotation:  $ROTATE°   User: $KIOSK_USER"
+echo "Rotation:  $ROTATE°   User: $KIOSK_USER   Edition: $EDITION"
 echo "Logs:      /tmp/foyer-kiosk.log (kiosk), journalctl -u foyer-agent (agent)"
 if [[ $DO_REBOOT -eq 1 ]]; then
   echo "Rebooting…"; sleep 2; systemctl reboot
