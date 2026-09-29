@@ -7,6 +7,7 @@ import {
   integer,
   timestamp,
   jsonb,
+  index,
 } from 'drizzle-orm/pg-core';
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
@@ -56,8 +57,59 @@ export const displays = pgTable('displays', {
   /** Last time we heard from the player at all. Drives the online/offline
    *  dot in the admin Displays view. */
   lastHeartbeatAt: timestamp('last_heartbeat_at', { withTimezone: true }),
+  /** When the player was last seen before it went quiet. Set the moment we
+   *  notice the heartbeat is older than OFFLINE_AFTER_SEC; cleared (and the
+   *  matching display_events row resolved) on the next heartbeat. Acts as
+   *  the "is there an open outage?" pointer so the heartbeat path never
+   *  has to query display_events. */
+  offlineSince: timestamp('offline_since', { withTimezone: true }),
+  /** What drives the TV: 'pi' (our Raspberry Pi kiosk + agent),
+   *  'optisigns', or 'browser' (anything else pointed at the URL). Set to
+   *  'pi' automatically the first time the agent checks in. */
+  hardware: text('hardware').default('browser').notNull(),
+  /** Raspberry Pi agent — last check-in and the vitals it reported
+   *  (hostname, ip, cpuTempC, uptimeSec, chromiumRunning, throttled…). */
+  agentLastSeenAt: timestamp('agent_last_seen_at', { withTimezone: true }),
+  agentInfo: jsonb('agent_info').$type<AgentInfo | null>(),
+  /** One queued command for the agent to pick up on its next check-in:
+   *  'reboot' | 'reload' | 'screenshot' | 'update'. Cleared when handed
+   *  over. Only one at a time — a newer request replaces the older one. */
+  pendingCommand: text('pending_command'),
+  pendingCommandAt: timestamp('pending_command_at', { withTimezone: true }),
+  pendingCommandBy: text('pending_command_by'),
+  /** Set when an admin asks the *browser* player to reload (works for any
+   *  hardware, not just Pi). The heartbeat response carries it back and
+   *  the column is cleared. */
+  reloadRequestedAt: timestamp('reload_requested_at', { withTimezone: true }),
+  /** Most recent screenshot the agent uploaded (Vercel Blob, overwritten
+   *  in place so we only ever store one per display). */
+  screenshotUrl: text('screenshot_url'),
+  screenshotAt: timestamp('screenshot_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+/**
+ * Uptime + activity history per display. Kept deliberately sparse: one
+ * row per outage (kind='offline', closed by `resolvedAt`), one per admin
+ * command, one per screenshot. Uptime percentages and the history strip
+ * are computed from the offline rows — no per-heartbeat storage.
+ */
+export const displayEvents = pgTable('display_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  displayId: uuid('display_id')
+    .notNull()
+    .references(() => displays.id, { onDelete: 'cascade' }),
+  /** 'offline' | 'command' | 'screenshot' | 'agent_installed' */
+  kind: text('kind').notNull(),
+  at: timestamp('at', { withTimezone: true }).defaultNow().notNull(),
+  /** For kind='offline': when the player came back. Null = still down. */
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  /** For kind='offline': when the downtime alert email went out (null if
+   *  the outage ended before the alert threshold, or alerts are off). */
+  alertedAt: timestamp('alerted_at', { withTimezone: true }),
+  meta: jsonb('meta').$type<Record<string, unknown>>().default({}),
+}, (t) => [index('display_events_display_at_idx').on(t.displayId, t.at)]);
 
 export const media = pgTable('media', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -94,6 +146,11 @@ export const settings = pgTable('settings', {
    *  — any @sainthelen.org address can sign in without being individually
    *  invited). Per-tenant override of the v1.0 hardcoded STAFF_DOMAINS list. */
   allowedDomain: text('allowed_domain'),
+  /** Downtime alerts. Comma-separated recipient list; empty = no emails.
+   *  A display that has been silent for `alertOfflineAfterMin` minutes
+   *  gets one "down" email, and one "back" email when it recovers. */
+  alertEmails: text('alert_emails'),
+  alertOfflineAfterMin: integer('alert_offline_after_min').default(10).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -355,9 +412,31 @@ export type SlideContent =
   | SanctuaryCandleContent
   | AppPromoContent;
 
+/** Vitals the Raspberry Pi agent reports on every check-in. Every field is
+ *  optional — older agents or non-Pi hardware may send a subset. */
+export type AgentInfo = {
+  agentVersion?: string;
+  hostname?: string;
+  ip?: string;
+  model?: string;
+  os?: string;
+  uptimeSec?: number;
+  cpuTempC?: number;
+  memUsedPct?: number;
+  diskUsedPct?: number;
+  chromiumRunning?: boolean;
+  /** Raw `vcgencmd get_throttled` value (hex string). Non-zero means the
+   *  Pi has seen under-voltage or thermal throttling since boot. */
+  throttled?: string;
+};
+
+export type DisplayHardware = 'pi' | 'optisigns' | 'browser';
+export type AgentCommand = 'reboot' | 'reload' | 'screenshot' | 'update';
+
 // Inferred row types for use throughout the app
 export type Tenant = typeof tenants.$inferSelect;
 export type Display = typeof displays.$inferSelect;
+export type DisplayEvent = typeof displayEvents.$inferSelect;
 export type Media = typeof media.$inferSelect;
 export type Settings = typeof settings.$inferSelect;
 export type Slide = typeof slides.$inferSelect;

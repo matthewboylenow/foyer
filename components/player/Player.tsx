@@ -32,12 +32,22 @@ type PlayerSlide = {
   resolvedMedia?: Record<string, string>;
 };
 
-type ApiResponse = { orientation: SlideOrientation; slides: PlayerSlide[] };
+type ApiResponse = {
+  orientation: SlideOrientation;
+  slides: PlayerSlide[];
+  /** Playlist fingerprint from the server (see lib/fleet.ts). */
+  version?: string | null;
+};
 
 // Bumped from v0 (slides[]) to v1 ({ orientation, slides }) — old cache entries
 // from before v1.9 won't deserialize correctly, so the new key invalidates them.
 const CACHE_KEY_PREFIX = 'lastFetch.v1';
-const POLL_INTERVAL_MS = 30_000;
+// The heartbeat (every HEARTBEAT_MS) carries the server's playlist version,
+// so we only fetch the playlist when it changes. The poll below is a
+// safety net for the case where heartbeats fail but GETs succeed; with
+// If-None-Match it costs the server one cheap query.
+const HEARTBEAT_MS = 60_000;
+const POLL_INTERVAL_MS = 15 * 60_000;
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function loadFromCache(displayId: string): ApiResponse | null {
@@ -102,6 +112,11 @@ export function Player({ displayId }: PlayerProps) {
   // Slides whose templates have thrown during this session — filtered out
   // of the pool on next rebuild so we don't loop on a broken slide.
   const [bannedIds, setBannedIds] = useState<Set<string>>(() => new Set());
+  // Last playlist version we loaded (also sent as If-None-Match).
+  const versionRef = useRef<string | null>(null);
+  // Mirror of `slides` for callbacks that shouldn't re-subscribe on change.
+  const slidesRef = useRef<PlayerSlide[]>([]);
+  slidesRef.current = slides;
 
   const banSlide = useCallback((id: string) => {
     setBannedIds((prev) => {
@@ -157,6 +172,7 @@ export function Player({ displayId }: PlayerProps) {
           const data = (await res.json()) as ApiResponse;
           if (data?.slides && data.slides.length > 0) {
             saveToCache(displayId, data);
+            versionRef.current = data.version ?? null;
             setOrientation(data.orientation);
             setSlides(data.slides);
             setPool(buildShuffledPool(data.slides));
@@ -170,6 +186,7 @@ export function Player({ displayId }: PlayerProps) {
 
       const cached = loadFromCache(displayId);
       if (cached?.slides && cached.slides.length > 0) {
+        versionRef.current = cached.version ?? null;
         setOrientation(cached.orientation);
         setSlides(cached.slides);
         setPool(buildShuffledPool(cached.slides));
@@ -182,28 +199,37 @@ export function Player({ displayId }: PlayerProps) {
     init();
   }, [displayId]);
 
-  // Poll for updates
+  // Fetch the playlist and queue any change for the next loop boundary.
+  // Sends If-None-Match so an unchanged playlist is a 304 (one cheap query
+  // server-side, no body).
+  const refetch = useCallback(async () => {
+    try {
+      const headers: Record<string, string> = {};
+      if (versionRef.current) headers['If-None-Match'] = `"${versionRef.current}"`;
+      const res = await fetch(`/api/display/${displayId}`, { cache: 'no-store', headers });
+      if (res.status === 304) return;
+      if (!res.ok) return;
+      const data = (await res.json()) as ApiResponse;
+      if (!data?.slides) return;
+      versionRef.current = data.version ?? null;
+      // Orientation can change live if the admin flips a display; update
+      // immediately so subsequent renders use the new aspect / templates.
+      setOrientation((prev) => (data.orientation !== prev ? data.orientation : prev));
+      if (slidesHaveChanged(slidesRef.current, data.slides)) {
+        queuedSlidesRef.current = data.slides;
+        saveToCache(displayId, data);
+      }
+    } catch {
+      // network blip — continue from current data
+    }
+  }, [displayId]);
+
+  // Safety-net poll. Real change detection happens on the heartbeat reply.
   useEffect(() => {
     if (!ready) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/display/${displayId}`, { cache: 'no-store' });
-        if (!res.ok) return;
-        const data = (await res.json()) as ApiResponse;
-        if (!data?.slides) return;
-        // Orientation can change live if the admin flips a display; update
-        // immediately so subsequent renders use the new aspect / templates.
-        if (data.orientation !== orientation) setOrientation(data.orientation);
-        if (slidesHaveChanged(slides, data.slides)) {
-          queuedSlidesRef.current = data.slides;
-          saveToCache(displayId, data);
-        }
-      } catch {
-        // network blip — continue from current data
-      }
-    }, POLL_INTERVAL_MS);
+    const interval = setInterval(refetch, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [displayId, slides, ready, orientation]);
+  }, [ready, refetch]);
 
   // Pre-decode the next slide's media during the current slide's hold so
   // image decode never blocks the cross-dissolve. Without this, the new
@@ -289,56 +315,47 @@ export function Player({ displayId }: PlayerProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Heartbeat — tell the admin what's currently on screen. Fires on every
-  // slide change AND every 60s as a liveness ping (so an idle TV stuck on
-  // the same slide still reads as "online" in the admin).
+  // Heartbeat — once a minute, carrying whatever is on screen right now.
+  // The reply tells us the server's playlist version (refetch if it moved)
+  // and whether an admin asked this player to reload. One request per
+  // minute per display instead of one per slide change.
+  const currentSlideIdRef = useRef<string | null>(null);
+  currentSlideIdRef.current = pool[currentIndex]?.id ?? null;
+
   useEffect(() => {
-    if (!ready || pool.length === 0) return;
-    const current = pool[currentIndex];
-    if (!current) return;
+    if (!ready) return;
+    let cancelled = false;
 
-    const payload = JSON.stringify({ slideId: current.id });
-    const url = `/api/display/${displayId}/heartbeat`;
-
-    // Use sendBeacon when available — it survives page navigation/unload
-    // and doesn't block. Fall back to fetch.
-    try {
-      if (navigator.sendBeacon) {
-        const blob = new Blob([payload], { type: 'application/json' });
-        navigator.sendBeacon(url, blob);
-      } else {
-        fetch(url, {
+    async function beat() {
+      try {
+        const res = await fetch(`/api/display/${displayId}/heartbeat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: payload,
+          body: JSON.stringify({ slideId: currentSlideIdRef.current }),
+          cache: 'no-store',
           keepalive: true,
-        }).catch(() => {
-          /* network blip — next slide change will retry */
         });
-      }
-    } catch {
-      /* sendBeacon can throw on some Tizen builds — swallow */
-    }
-
-    const ping = setInterval(() => {
-      try {
-        if (navigator.sendBeacon) {
-          const blob = new Blob([payload], { type: 'application/json' });
-          navigator.sendBeacon(url, blob);
-        } else {
-          fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: payload,
-            keepalive: true,
-          }).catch(() => {});
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { version?: string | null; reload?: boolean };
+        if (data.reload) {
+          window.location.reload();
+          return;
+        }
+        if (data.version && data.version !== versionRef.current) {
+          void refetch();
         }
       } catch {
-        /* swallow */
+        /* network blip — next minute will retry */
       }
-    }, 60_000);
-    return () => clearInterval(ping);
-  }, [currentIndex, pool, ready, displayId]);
+    }
+
+    void beat();
+    const ping = setInterval(beat, HEARTBEAT_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(ping);
+    };
+  }, [ready, displayId, refetch]);
 
   const handleSlideDone = useCallback(() => {
     setCurrentIndex((prev) => {

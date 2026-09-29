@@ -21,6 +21,9 @@ export async function PATCH(
   if ('orientation' in body) {
     update.orientation = body.orientation === 'landscape' ? 'landscape' : 'portrait';
   }
+  if ('hardware' in body) {
+    update.hardware = ['pi', 'optisigns', 'browser'].includes(body.hardware) ? body.hardware : 'browser';
+  }
 
   const [updated] = await db.update(displays).set(update).where(eq(displays.id, id)).returning();
   if (!updated) return Response.json({ error: 'Not found' }, { status: 404 });

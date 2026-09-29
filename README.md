@@ -59,6 +59,45 @@ Rules of thumb when authoring: background photos should land under ~1 MB after t
 automatic compression; video loops ~10s at ≤15 MB; check the media library, which
 shows the stored size of every asset, and delete unused files.
 
+## Raspberry Pi players (no OptiSigns needed)
+
+Any browser pointed at `/display/<id>` is a player, so OptiSigns keeps working
+unchanged. To run a screen without a subscription, use a Raspberry Pi 4/5 with
+the official power supply and a fan case (~$100 one time):
+
+1. Flash **Raspberry Pi OS (64-bit) with desktop** using Raspberry Pi Imager
+   (set a user, Wi-Fi and SSH in the imager's settings).
+2. Boot it on the TV, open a terminal (or SSH in), and paste the command from
+   **Displays → ⋯ → Set up a Raspberry Pi**. It looks like:
+
+   ```
+   curl -fsSL https://signage.sainthelen.org/pi/install.sh | sudo bash -s -- \
+     --url https://signage.sainthelen.org --display <display-uuid> --rotate 90 --reboot
+   ```
+
+   `public/pi/install.sh` installs Chromium in kiosk mode, rotates the output,
+   disables screen blanking, auto-logs into the desktop, and installs
+   `public/pi/foyer-agent.sh` as a systemd timer.
+3. Within a minute the display card shows a **Raspberry Pi** badge with the
+   Pi's temperature, uptime and IP, and the **Reboot**, **Screenshot** and
+   **Update agent** actions light up.
+
+**How monitoring works.** The player heartbeats once a minute
+(`POST /api/display/[id]/heartbeat`); the reply carries the playlist version,
+so the player only refetches the playlist when something changed (with an
+`If-None-Match` ETag as a safety net every 15 minutes). The Pi agent checks
+in once a minute (`POST /api/display/[id]/agent`) with vitals and collects one
+queued command. A cron (`/api/cron/display-check`, every 5 minutes, see
+`vercel.json`; needs `CRON_SECRET`) opens outage rows in `display_events` and
+emails the addresses in **Settings → Screen alerts** once a screen has been
+silent past the threshold; the heartbeat route closes the outage and sends the
+"back online" email. Uptime percentages and the 7-day strip on the Displays
+page are computed from those outage rows — nothing is stored per heartbeat.
+
+On the Vercel Hobby plan crons only run daily; point any external pinger
+(UptimeKuma, a Pi cron) at `/api/cron/display-check` with
+`Authorization: Bearer $CRON_SECRET` every 5 minutes instead.
+
 ## Brand and Voice
 
 This app does not generate content. The brand voice (warm, personal, Saint Helen) is enforced by the content authored in the admin, not by the templates. The templates enforce the visual brand: navy, rust, cream, gold, Libre Baskerville and Libre Franklin.

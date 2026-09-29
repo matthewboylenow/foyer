@@ -57,6 +57,13 @@
       "when": 1779594563297,
       "tag": "0007_v19_font_pair",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790641856224,
+      "tag": "0008_v20_fleet_monitoring",
+      "breakpoints": true
     }
   ]
 }

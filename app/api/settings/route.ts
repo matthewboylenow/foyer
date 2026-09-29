@@ -28,6 +28,15 @@ export async function PATCH(req: Request) {
   // Per-tenant email "from" name + address.
   if ('emailFromName' in body) update.emailFromName = body.emailFromName;
   if ('emailFromAddress' in body) update.emailFromAddress = body.emailFromAddress;
+  // Downtime alerts: recipients (free text, parsed at send time) and the
+  // minutes a screen must be silent before the first email goes out.
+  if ('alertEmails' in body) {
+    update.alertEmails = typeof body.alertEmails === 'string' ? body.alertEmails.slice(0, 2000) : null;
+  }
+  if ('alertOfflineAfterMin' in body) {
+    const n = Number(body.alertOfflineAfterMin);
+    if (Number.isFinite(n)) update.alertOfflineAfterMin = Math.min(1440, Math.max(5, Math.round(n)));
+  }
   // Per-tenant slide font pair. Validate against the curated list so an
   // attacker can't smuggle a third-party CSS URL into the picker.
   if ('fontPair' in body && typeof body.fontPair === 'string') {

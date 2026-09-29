@@ -26,7 +26,7 @@ import { templates } from '@/components/templates';
 import type { TemplateKey } from '@/components/templates';
 import { CollectionPicker } from './CollectionPicker';
 import type { SlideWithContent, SlideContent, MassScheduleRow, SizePreset, TextMode, Collection, SlideOrientation } from '@/lib/db/schema';
-import type { TimeValue } from '@/lib/time';
+import { dateToTimeValue, type TimeValue } from '@/lib/time';
 
 type OrientationMedia = {
   logoUrl?: string | null;
@@ -45,6 +45,29 @@ interface SlideEditorProps {
     portrait?: OrientationMedia;
     landscape?: OrientationMedia;
   };
+}
+
+/**
+ * Build a local-time Date from a YYYY-MM-DD string and a 12-hour TimeValue.
+ * `new Date('2026-10-12')` would parse as UTC midnight, which is the
+ * previous evening in the US — so we construct from parts instead.
+ */
+function joinLocal(date: string, time: TimeValue): Date {
+  const [y, m, d] = date.split('-').map((p) => parseInt(p, 10));
+  let h = time.hour % 12;
+  if (time.period === 'PM') h += 12;
+  return new Date(y, (m || 1) - 1, d || 1, h, time.minute, 0, 0);
+}
+
+/** Inverse of joinLocal: an instant → local date string + TimeValue. */
+function splitLocal(value: Date | string | null): { date: string; time: TimeValue } | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  // dateToTimeValue rounds to the picker's 5-minute steps.
+  return { date, time: dateToTimeValue(d) };
 }
 
 function isContentEmpty(c: unknown): boolean {
@@ -117,14 +140,20 @@ export function SlideEditor({
   const [scheduleType, setScheduleType] = useState<'evergreen' | 'dated'>(
     initialSlide?.scheduleType ?? 'evergreen',
   );
-  const [startDate, setStartDate] = useState(
-    initialSlide?.startAt ? new Date(initialSlide.startAt).toISOString().split('T')[0] : '',
+  // Dates are edited in the browser's local time and stored as instants.
+  // Split the saved instant into a local YYYY-MM-DD + TimeValue (the old
+  // code used toISOString(), which is UTC — every save in a US timezone
+  // moved the date one day earlier).
+  const initialStart = splitLocal(initialSlide?.startAt ?? null);
+  const initialEnd = splitLocal(initialSlide?.endAt ?? null);
+  const [startDate, setStartDate] = useState(initialStart?.date ?? '');
+  const [startTime, setStartTime] = useState<TimeValue>(
+    initialStart?.time ?? { hour: 12, minute: 0, period: 'AM' },
   );
-  const [startTime, setStartTime] = useState<TimeValue>({ hour: 12, minute: 0, period: 'AM' });
-  const [endDate, setEndDate] = useState(
-    initialSlide?.endAt ? new Date(initialSlide.endAt).toISOString().split('T')[0] : '',
+  const [endDate, setEndDate] = useState(initialEnd?.date ?? '');
+  const [endTime, setEndTime] = useState<TimeValue>(
+    initialEnd?.time ?? { hour: 11, minute: 59, period: 'PM' },
   );
-  const [endTime, setEndTime] = useState<TimeValue>({ hour: 11, minute: 59, period: 'PM' });
   const [weight, setWeight] = useState(String(initialSlide?.weight ?? 1));
   const [durationOverride, setDurationOverride] = useState(
     initialSlide?.durationOverrideSec ? String(initialSlide.durationOverrideSec) : '',
@@ -182,20 +211,8 @@ export function SlideEditor({
     };
 
     if (scheduleType === 'dated') {
-      if (startDate) {
-        const d = new Date(startDate);
-        let h = startTime.hour % 12;
-        if (startTime.period === 'PM') h += 12;
-        d.setHours(h, startTime.minute, 0, 0);
-        body.startAt = d.toISOString();
-      }
-      if (endDate) {
-        const d = new Date(endDate);
-        let h = endTime.hour % 12;
-        if (endTime.period === 'PM') h += 12;
-        d.setHours(h, endTime.minute, 0, 0);
-        body.endAt = d.toISOString();
-      }
+      body.startAt = startDate ? joinLocal(startDate, startTime).toISOString() : null;
+      body.endAt = endDate ? joinLocal(endDate, endTime).toISOString() : null;
     } else {
       body.startAt = null;
       body.endAt = null;

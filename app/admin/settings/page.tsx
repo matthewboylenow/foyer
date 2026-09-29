@@ -6,6 +6,7 @@ import { LogoSection } from '@/components/admin/LogoSection';
 import { PaletteEditor } from '@/components/admin/PaletteEditor';
 import { FontPairPicker } from '@/components/admin/FontPairPicker';
 import { EmailFromEditor } from '@/components/admin/EmailFromEditor';
+import { AlertSettingsEditor } from '@/components/admin/AlertSettingsEditor';
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/lib/auth/config';
 
@@ -89,6 +90,23 @@ export default async function SettingsPage() {
               emailFromAddress: settings?.emailFromAddress ?? null,
             }}
             envFallback={envFromFallback}
+          />
+        </section>
+
+        {/* Downtime alerts */}
+        <section id="alerts" className="rounded-xl border border-navy/10 bg-cream p-6 space-y-5 scroll-mt-8">
+          <div>
+            <h2 className="font-serif text-lg font-semibold text-navy">Screen alerts</h2>
+            <p className="text-sm text-navy/55 mt-1">
+              Get an email when a TV stops checking in, and another when it is back. Uses
+              the sender above.
+            </p>
+          </div>
+          <AlertSettingsEditor
+            initial={{
+              alertEmails: settings?.alertEmails ?? null,
+              alertOfflineAfterMin: settings?.alertOfflineAfterMin ?? 10,
+            }}
           />
         </section>
 

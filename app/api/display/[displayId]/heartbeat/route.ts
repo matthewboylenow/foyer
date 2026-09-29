@@ -1,20 +1,27 @@
 import { db } from '@/lib/db/client';
 import { displays } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { computePlaylistVersion, resolveOutage } from '@/lib/fleet';
+
+const NO_STORE = { 'Cache-Control': 'no-store' };
 
 /**
  * POST /api/display/[displayId]/heartbeat
  *
  * Body: { slideId: string | null }
  *
- * Called by the TV player on every slide change. Unauthenticated by design
- * — the displayId itself is the credential (it's a UUID embedded in the
+ * Called by the TV player once a minute (not on every slide change — that
+ * was ~6,500 requests per display per day). Unauthenticated by design —
+ * the displayId itself is the credential (it's a UUID embedded in the
  * kiosk URL, same trust model as the GET endpoint that serves slides).
  *
- * Writes the new currentSlideId, currentSlideStartedAt, and lastHeartbeatAt
- * so the admin Displays view can show what's on screen right now. If the
- * incoming slideId matches what's already stored, only lastHeartbeatAt is
- * touched — that way "time on screen" stays accurate across page reloads.
+ * Does three things:
+ *   1. Records liveness + what's on screen (currentSlideStartedAt only
+ *      moves when the slide actually changed, so "time on screen" stays
+ *      honest across reloads).
+ *   2. Closes an open outage if this display had been marked offline.
+ *   3. Answers with the current playlist `version` and a `reload` flag, so
+ *      the player can refetch or reload without polling anything else.
  */
 export async function POST(
   req: Request,
@@ -28,30 +35,35 @@ export async function POST(
     const body = (await req.json()) as { slideId?: string | null };
     slideId = typeof body?.slideId === 'string' ? body.slideId : null;
   } catch {
-    // sendBeacon sometimes posts an empty body — that's fine, treat as
-    // "still alive, no slide change."
+    // Empty body — treat as "still alive, no slide change."
   }
 
   const existing = await db.query.displays.findFirst({
     where: eq(displays.id, displayId),
-    columns: { currentSlideId: true },
   });
   if (!existing) {
     return Response.json({ error: 'Unknown display' }, { status: 404 });
   }
 
   const slideChanged = slideId && slideId !== existing.currentSlideId;
-  await db
-    .update(displays)
-    .set({
-      lastHeartbeatAt: now,
-      ...(slideChanged
-        ? { currentSlideId: slideId, currentSlideStartedAt: now }
-        : {}),
-    })
-    .where(eq(displays.id, displayId));
+  const reload = !!existing.reloadRequestedAt;
 
-  return Response.json({ ok: true }, {
-    headers: { 'Cache-Control': 'no-store' },
-  });
+  const [, version] = await Promise.all([
+    db
+      .update(displays)
+      .set({
+        lastHeartbeatAt: now,
+        ...(slideChanged ? { currentSlideId: slideId, currentSlideStartedAt: now } : {}),
+        ...(reload ? { reloadRequestedAt: null } : {}),
+      })
+      .where(eq(displays.id, displayId)),
+    computePlaylistVersion(displayId),
+  ]);
+
+  if (existing.offlineSince) {
+    // Back from an outage — close it (and email if we had alerted).
+    await resolveOutage(existing, now);
+  }
+
+  return Response.json({ ok: true, version, reload }, { headers: NO_STORE });
 }
