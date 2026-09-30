@@ -170,6 +170,9 @@ export function SlideEditor({
   );
   const [active, setActive] = useState(initialSlide?.active ?? true);
   const [priority, setPriority] = useState(initialSlide?.priority ?? false);
+  const [pin, setPin] = useState<'start' | 'end' | null>(
+    initialSlide?.pin === 'start' || initialSlide?.pin === 'end' ? initialSlide.pin : null,
+  );
   const [targetDisplays, setTargetDisplays] = useState<string[]>(
     (initialSlide?.targetDisplays as string[]) ?? [],
   );
@@ -218,6 +221,7 @@ export function SlideEditor({
       scheduleType,
       active,
       priority,
+      pin,
       weight: parseFloat(weight) || 1,
       durationOverrideSec: durationOverride ? parseInt(durationOverride) : null,
       targetDisplays,
@@ -497,6 +501,34 @@ export function SlideEditor({
               While this slide is on (and within its dates), the TVs show only takeover
               slides — nothing else. For a funeral notice, a weather closure, an emergency
               message. Turn it off to resume the normal rotation.
+            </p>
+          </div>
+
+          {/* Position in the loop */}
+          <div className="p-4 border border-border rounded-lg space-y-3">
+            <h3 className="font-medium text-sm">Where in the loop</h3>
+            <div className="flex flex-col gap-2">
+              {([
+                [null, 'Anywhere (shuffled with the other announcements)'],
+                ['start', 'Start of every loop'],
+                ['end', 'End of every loop'],
+              ] as const).map(([value, label]) => (
+                <label key={String(value)} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="pin"
+                    checked={pin === value}
+                    onChange={() => setPin(value)}
+                    className="accent-rust"
+                  />
+                  <span className="text-sm">{label}</span>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Pinned slides play once per loop in the order they sit on the Slides page (drag
+              to reorder). Use this for Welcome at the start and Mass intentions, Mass
+              association and the Sanctuary candle at the end.
             </p>
           </div>
 

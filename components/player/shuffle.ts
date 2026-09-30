@@ -3,6 +3,7 @@
 // have been JSON-stringified) without fighting the SlideWithContent type.
 
 type Weighted = { weight?: number | null };
+type Pinnable = Weighted & { pin?: string | null; displayOrder?: number | null; title?: string };
 type IdAndUpdated = { id: string; updatedAt: string | Date };
 
 export function shuffle<T>(arr: T[]): T[] {
@@ -27,9 +28,29 @@ export function expandByWeight<T extends Weighted>(slides: T[]): T[] {
   return pool;
 }
 
-export function buildShuffledPool<T extends Weighted>(slides: T[]): T[] {
-  const pool = expandByWeight(slides);
-  return shuffle(pool.length > 0 ? pool : slides);
+/** Pinned slides in admin drag order (displayOrder asc, 0 = unsorted last), then title. */
+function byOrder<T extends Pinnable>(a: T, b: T): number {
+  const ao = a.displayOrder && a.displayOrder > 0 ? a.displayOrder : Number.MAX_SAFE_INTEGER;
+  const bo = b.displayOrder && b.displayOrder > 0 ? b.displayOrder : Number.MAX_SAFE_INTEGER;
+  if (ao !== bo) return ao - bo;
+  return (a.title ?? '').localeCompare(b.title ?? '');
+}
+
+/**
+ * One loop of the rotation: slides pinned to the start (in drag order),
+ * then the weighted shuffle of everything unpinned, then slides pinned to
+ * the end (in drag order). Pinned slides play exactly once per loop
+ * regardless of weight, so "Welcome first, the parish slides last" holds
+ * every time round.
+ */
+export function buildShuffledPool<T extends Pinnable>(slides: T[]): T[] {
+  const start = slides.filter((s) => s.pin === 'start').sort(byOrder);
+  const end = slides.filter((s) => s.pin === 'end').sort(byOrder);
+  const middle = slides.filter((s) => s.pin !== 'start' && s.pin !== 'end');
+  const pool = expandByWeight(middle);
+  const shuffled = shuffle(pool.length > 0 ? pool : middle);
+  const loop = [...start, ...shuffled, ...end];
+  return loop.length > 0 ? loop : slides;
 }
 
 export function slidesHaveChanged<T extends IdAndUpdated>(a: T[], b: T[]): boolean {

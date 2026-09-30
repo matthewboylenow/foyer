@@ -113,6 +113,15 @@ run, and create them in a new "Email blast · <date>" collection; last week's
 email slides are turned off in the same step. Needs `ANTHROPIC_API_KEY` on the
 server. Headlines render at the small size only; the size picker is gone.
 
+## Loop order: pins
+
+Rotation is a weighted shuffle, except for pinned slides (`slides.pin`,
+set under "Where in the loop" in the editor): 'start' slides play first
+every loop and 'end' slides play last, each exactly once, in the drag order
+of the Slides page. Saint Helen pins Welcome to the start and Mass
+Intentions → Weekly Mass Association → Sanctuary Candle to the end, so the
+loop always closes with the parish slides and reopens on Welcome.
+
 ## Takeover, QR codes, posters, event dates
 
 - **Takeover** (a switch in the slide editor, `slides.priority`): while any

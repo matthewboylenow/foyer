@@ -187,7 +187,19 @@ FLAGS=(
 # but exits immediately on others; set FOYER_OZONE_WAYLAND=1 in foyer.env to try it.
 [[ -n "${WAYLAND_DISPLAY:-}" && "${FOYER_OZONE_WAYLAND:-0}" == "1" ]] && FLAGS+=(--ozone-platform=wayland)
 
+# Don't hand Chromium a URL it can't reach — after a power cut the Pi is
+# often up before the Wi-Fi/router is. Wait (black screen) until Foyer
+# answers, then launch; same again if Chromium ever exits.
+wait_for_foyer() {
+  local n=0
+  until curl -fsS --max-time 5 -o /dev/null "$FOYER_URL/api/display/$FOYER_DISPLAY_ID"; do
+    n=$((n + 1)); [[ $n -eq 1 || $((n % 12)) -eq 0 ]] && echo "$(date -Is) waiting for $FOYER_URL (network?)" >>"$LOG"
+    sleep 5
+  done
+}
+
 while true; do
+  wait_for_foyer
   "$FOYER_CHROMIUM" "${FLAGS[@]}" >>"$LOG" 2>&1
   echo "$(date -Is) chromium exited ($?), restarting in 2s" >>"$LOG"
   sleep 2

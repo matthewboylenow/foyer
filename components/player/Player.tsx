@@ -24,6 +24,7 @@ type PlayerSlide = {
   weight: number;
   durationOverrideSec: number | null;
   priority?: boolean;
+  pin?: string | null;
   collectionId: string | null;
   displayOrder: number;
   createdAt: string | Date;
@@ -92,6 +93,7 @@ const FALLBACK_SLIDE: PlayerSlide = {
   weight: 1,
   durationOverrideSec: null,
   priority: false,
+  pin: null,
   displayOrder: 0,
   collectionId: null,
   createdAt: new Date(),

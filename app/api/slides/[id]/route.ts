@@ -40,7 +40,7 @@ export async function PATCH(
 
   const allowed = [
     'title', 'content', 'contentLandscape', 'scheduleType', 'startAt', 'endAt',
-    'active', 'priority', 'weight', 'durationOverrideSec', 'targetDisplays',
+    'active', 'priority', 'pin', 'weight', 'durationOverrideSec', 'targetDisplays',
     'collectionId',
   ];
 
@@ -53,6 +53,8 @@ export async function PATCH(
         // shape (NOT NULL) so existing query code stays simple.
         const c = body[key];
         updateData[key] = c && typeof c === 'object' && Object.keys(c).length > 0 ? c : {};
+      } else if (key === 'pin') {
+        updateData[key] = body[key] === 'start' || body[key] === 'end' ? body[key] : null;
       } else if (key === 'contentLandscape') {
         // Empty / null landscape becomes null so the column reads as
         // "unauthored" and slides.contentLandscape can stay nullable.

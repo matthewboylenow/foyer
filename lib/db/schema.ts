@@ -198,6 +198,13 @@ export const slides = pgTable('slides', {
    *  emergency message. Turn it off (or let its end date pass) and the
    *  normal rotation resumes on the next heartbeat. */
   priority: boolean('priority').default(false).notNull(),
+  /** Position in the loop. null = shuffled with everything else (weighted);
+   *  'start' = plays first every loop; 'end' = plays last every loop.
+   *  Pinned slides play exactly once per loop, ordered by displayOrder
+   *  (drag order on the Slides page), so "Welcome → announcements →
+   *  Mass intentions, Mass association, Sanctuary candle → Welcome…" is
+   *  just four pins. */
+  pin: text('pin'),
   weight: integer('weight').default(1).notNull(),
   durationOverrideSec: integer('duration_override_sec'),
   /** Optional collection membership. ON DELETE SET NULL: deleting a
@@ -461,6 +468,7 @@ export type AgentInfo = {
 };
 
 export type DisplayHardware = 'pi' | 'optisigns' | 'browser';
+export type SlidePin = 'start' | 'end';
 export type AgentCommand = 'reboot' | 'reload' | 'screenshot' | 'update';
 
 // Inferred row types for use throughout the app

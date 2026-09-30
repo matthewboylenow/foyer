@@ -248,6 +248,11 @@ export function SlideCard({
 
         <div className="flex items-center gap-2 mt-2 text-[11px] text-navy/55">
           <Calendar size={11} className="shrink-0" />
+          {(slide.pin === 'start' || slide.pin === 'end') && (
+            <span className="shrink-0 text-[9px] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded bg-navy text-cream">
+              {slide.pin === 'start' ? 'Loop start' : 'Loop end'}
+            </span>
+          )}
           {slide.priority && (
             <span className="shrink-0 text-[9px] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded bg-rust text-cream">
               Takeover
