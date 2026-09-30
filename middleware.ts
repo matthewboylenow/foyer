@@ -24,11 +24,17 @@ export default auth((req: NextRequest & { auth: unknown }) => {
   const { pathname } = req.nextUrl;
   if (process.env.AUTH_DEV_BYPASS !== '1') {
     const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/super');
+    // Public API surface: the player (/api/display/*), sign-in, and the
+    // player's error reporting. /api/errors accepts POSTs from TVs that
+    // have no session by design (see its route file); protecting it here
+    // silently redirected every report to /login.
     const isProtectedApi =
       pathname.startsWith('/api/') &&
       !pathname.startsWith('/api/display') &&
       !pathname.startsWith('/api/auth') &&
-      !pathname.startsWith('/api/otp');
+      !pathname.startsWith('/api/otp') &&
+      !pathname.startsWith('/api/errors') &&
+      !pathname.startsWith('/api/cron');
 
     if ((isAdminRoute || isProtectedApi) && !(req as { auth: unknown }).auth) {
       const url = new URL('/login', req.url);
