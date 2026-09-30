@@ -54,13 +54,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  session: { strategy: 'database' },
+  // Credentials (email OTP) sign-in only works with JWT sessions — Auth.js
+  // never writes a database session for a Credentials login, so with
+  // strategy 'database' the code verified and then nothing happened. The
+  // adapter stays for the Entra ID provider's account linking.
+  session: { strategy: 'jwt', maxAge: 30 * 24 * 60 * 60 },
   pages: {
     signIn: '/login',
   },
   callbacks: {
-    async session({ session, user }) {
-      if (user) session.user.id = user.id;
+    async jwt({ token, user }) {
+      if (user?.id) token.id = user.id;
+      return token;
+    },
+    async session({ session, token }) {
+      if (token?.id) session.user.id = String(token.id);
       return session;
     },
   },
