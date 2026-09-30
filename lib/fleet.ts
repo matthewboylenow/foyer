@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { displays, displayEvents, settings, slides, tenants } from '@/lib/db/schema';
+import { displays, displayEvents, playlistSnapshots, settings, slides, tenants } from '@/lib/db/schema';
 import type { AgentCommand, Display, DisplayEvent, Settings } from '@/lib/db/schema';
 import {
   OFFLINE_AFTER_SEC,
@@ -36,10 +36,32 @@ import { getResend, resolveFromAddress } from '@/lib/email';
  */
 export async function computePlaylistVersion(displayId: string): Promise<string | null> {
   const now = new Date();
+  // Snapshot term: the latest snapshot's id plus which of its slides are
+  // inside their dates right now (so an expiry still bumps the version).
+  // Empty when the tenant has never published, in which case the live
+  // string_agg below carries the version instead.
+  const snapshotTerm = sql<string>`coalesce((
+    SELECT ps.id::text || '#' || coalesce((
+      SELECT string_agg(e->>'id', ',' ORDER BY e->>'id')
+      FROM jsonb_array_elements(ps.slides) e
+      WHERE (e->>'active')::boolean
+        AND (
+          (e->>'scheduleType') <> 'dated'
+          OR (
+            ((e->>'startAt') IS NULL OR (e->>'startAt')::timestamptz <= now())
+            AND ((e->>'endAt') IS NULL OR (e->>'endAt')::timestamptz >= now())
+          )
+        )
+    ), '')
+    FROM ${playlistSnapshots} ps
+    WHERE ps.tenant_id = ${displays.tenantId}
+    ORDER BY ps.published_at DESC
+    LIMIT 1
+  ), 'live:' || coalesce(string_agg(${slides.id}::text || ':' || ${slides.updatedAt}::text, ',' ORDER BY ${slides.id}), ''))`;
   const [row] = await db
     .select({
       version: sql<string>`md5(
-        coalesce(string_agg(${slides.id}::text || ':' || ${slides.updatedAt}::text, ',' ORDER BY ${slides.id}), '')
+        ${snapshotTerm}
         || '|' || ${displays.orientation} || '|' || ${displays.active}::text
         || '|' || coalesce(${settings.updatedAt}::text, '')
       )`,
@@ -62,7 +84,7 @@ export async function computePlaylistVersion(displayId: string): Promise<string 
       ),
     )
     .where(eq(displays.id, displayId))
-    .groupBy(displays.id, displays.orientation, displays.active, settings.updatedAt);
+    .groupBy(displays.id, displays.tenantId, displays.orientation, displays.active, settings.updatedAt);
   return row?.version ?? null;
 }
 

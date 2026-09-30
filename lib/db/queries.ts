@@ -1,7 +1,8 @@
 import { eq, and, or, isNull, lte, gte, asc, desc } from 'drizzle-orm';
 import { db } from './client';
 import { slides, displays, settings, tenants, auditLog, errors, collections, media } from './schema';
-import type { SlideWithContent, SlideContent, SlideOrientation } from './schema';
+import type { SlideWithContent, SlideContent, SlideOrientation, Slide } from './schema';
+import { getLatestSnapshot, isWithinSchedule } from '@/lib/publish';
 
 /**
  * Picks the orientation-appropriate content slot for a slide and reports
@@ -40,21 +41,37 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
   const orientation = (display.orientation === 'landscape' ? 'landscape' : 'portrait') as SlideOrientation;
 
   const now = new Date();
-  const eligible = await db.query.slides.findMany({
-    where: and(
-      eq(slides.tenantId, display.tenantId),
-      eq(slides.active, true),
-      or(
-        eq(slides.scheduleType, 'evergreen'),
-        and(
-          eq(slides.scheduleType, 'dated'),
-          or(isNull(slides.startAt), lte(slides.startAt, now)),
-          or(isNull(slides.endAt), gte(slides.endAt, now)),
+
+  // Published snapshot wins; before the first publish, the live rows.
+  const snapshot = await getLatestSnapshot(display.tenantId);
+  let eligible: Slide[];
+  if (snapshot) {
+    eligible = snapshot.slides
+      .map((s) => ({
+        ...s,
+        startAt: s.startAt ? new Date(s.startAt) : null,
+        endAt: s.endAt ? new Date(s.endAt) : null,
+        createdAt: new Date(s.createdAt),
+        updatedAt: new Date(s.updatedAt),
+      }))
+      .filter((s) => s.active && isWithinSchedule(s, now));
+  } else {
+    eligible = await db.query.slides.findMany({
+      where: and(
+        eq(slides.tenantId, display.tenantId),
+        eq(slides.active, true),
+        or(
+          eq(slides.scheduleType, 'evergreen'),
+          and(
+            eq(slides.scheduleType, 'dated'),
+            or(isNull(slides.startAt), lte(slides.startAt, now)),
+            or(isNull(slides.endAt), gte(slides.endAt, now)),
+          ),
         ),
       ),
-    ),
-    orderBy: [desc(slides.updatedAt)],
-  });
+      orderBy: [desc(slides.updatedAt)],
+    });
+  }
 
   // Filter by display targeting AND by orientation availability. A slide
   // with empty content for this display's orientation is filtered out —

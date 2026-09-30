@@ -70,8 +70,9 @@ export function EmailImport() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [collectionName, setCollectionName] = useState(defaultCollectionName);
   const [deactivatePrevious, setDeactivatePrevious] = useState(true);
+  const [publishNow, setPublishNow] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [done, setDone] = useState<{ created: number; deactivated: number; collectionId: string } | null>(null);
+  const [done, setDone] = useState<{ created: number; deactivated: number; collectionId: string; published: boolean } | null>(null);
 
   const included = useMemo(() => drafts.filter((d) => d.include), [drafts]);
 
@@ -134,6 +135,7 @@ export function EmailImport() {
         body: JSON.stringify({
           collectionName,
           deactivatePrevious,
+          publish: publishNow,
           items: included.map((d) => ({
             heading: d.heading,
             subtitle: d.subtitle,
@@ -145,9 +147,9 @@ export function EmailImport() {
           })),
         }),
       });
-      const data = (await res.json()) as { created?: number; deactivated?: number; collectionId?: string; error?: string };
+      const data = (await res.json()) as { created?: number; deactivated?: number; collectionId?: string; published?: boolean; error?: string };
       if (!res.ok || data.created === undefined) throw new Error(data.error ?? 'Could not create slides');
-      setDone({ created: data.created, deactivated: data.deactivated ?? 0, collectionId: data.collectionId ?? '' });
+      setDone({ created: data.created, deactivated: data.deactivated ?? 0, collectionId: data.collectionId ?? '', published: !!data.published });
       toast.success(`${data.created} slides created`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not create slides');
@@ -159,11 +161,15 @@ export function EmailImport() {
   if (done) {
     return (
       <div className="rounded-xl border border-navy/15 bg-cream p-6 space-y-3">
-        <p className="font-serif text-2xl text-navy">This week is on the screens.</p>
+        <p className="font-serif text-2xl text-navy">
+          {done.published ? 'This week is on the screens.' : 'This week is staged.'}
+        </p>
         <p className="text-sm text-navy/70">
           {done.created} slide{done.created === 1 ? '' : 's'} created in “{collectionName}”
           {done.deactivated > 0 ? `, and ${done.deactivated} from the previous email turned off` : ''}.
-          The TVs pick up the change within a minute.
+          {done.published
+            ? ' The TVs pick up the change within a minute.'
+            : ' Nothing changes on the TVs until you press Publish on the Slides page.'}
         </p>
         <div className="flex gap-2">
           <Link
@@ -318,11 +324,15 @@ export function EmailImport() {
               <Switch checked={deactivatePrevious} onCheckedChange={setDeactivatePrevious} />
               <Label className="text-sm">Turn off last week&apos;s email slides</Label>
             </div>
+            <div className="flex items-center gap-3 sm:col-span-2">
+              <Switch checked={publishNow} onCheckedChange={setPublishNow} />
+              <Label className="text-sm">Publish to the screens right away</Label>
+            </div>
           </div>
           <p className="text-xs text-navy/50">
-            Slides go live immediately in the normal rotation. Slides with an event date and the
-            switch on turn themselves off the morning after. Everything is editable afterwards
-            on the Slides page.
+            With publish on, the TVs switch to the new set within a minute. Otherwise the slides
+            wait, staged, until you press Publish on the Slides page. Slides with an event date
+            and the switch on turn themselves off the morning after.
           </p>
           <Button onClick={create} disabled={creating || included.length === 0} className="bg-navy text-cream">
             {creating ? 'Creating…' : `Create ${included.length} slide${included.length === 1 ? '' : 's'}`}

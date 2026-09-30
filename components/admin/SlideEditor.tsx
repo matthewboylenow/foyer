@@ -239,7 +239,7 @@ export function SlideEditor({
     return body;
   }
 
-  async function handleSave() {
+  async function handleSave(publishAfter = false) {
     if (!title.trim()) {
       toast.error('Title is required');
       return;
@@ -273,7 +273,15 @@ export function SlideEditor({
 
       const saved = await res.json();
       setSavedState('saved');
-      toast.success('Saved');
+      if (publishAfter) {
+        const pub = await fetch('/api/publish', { method: 'POST' });
+        if (!pub.ok) throw new Error('Saved, but publishing failed');
+        toast.success('Saved and published — on the screens within a minute');
+      } else if (priority) {
+        toast.success('Saved — takeover slides go live immediately');
+      } else {
+        toast.success('Saved. Publish from the Slides page (or Save & publish) to put it on the screens.');
+      }
 
       if (isNew) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -282,7 +290,7 @@ export function SlideEditor({
     } catch (err) {
       setSavedState('error');
       toast.error(`Couldn't save: ${err instanceof Error ? err.message : 'Unknown error'}`, {
-        action: { label: 'Retry', onClick: handleSave },
+        action: { label: 'Retry', onClick: () => handleSave(publishAfter) },
       });
     } finally {
       setSaving(false);
@@ -292,7 +300,7 @@ export function SlideEditor({
   // ⌘S / Ctrl+S to save from anywhere in the editor (including fields).
   useHotkey('mod+s', (e) => {
     e.preventDefault();
-    if (!saving) handleSave();
+    if (!saving) handleSave(false);
   });
 
   return (
@@ -307,13 +315,19 @@ export function SlideEditor({
             {savedState === 'saved' ? 'Saved' : savedState === 'error' ? 'Error saving' : templateConfig.label}
           </p>
         </div>
-        <Button
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-rust hover:bg-rust-700 text-cream shrink-0"
-        >
-          {saving ? 'Saving…' : 'Save'}
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button onClick={() => handleSave(false)} disabled={saving} variant="outline">
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+          <Button
+            onClick={() => handleSave(true)}
+            disabled={saving}
+            className="bg-rust hover:bg-rust-700 text-cream"
+            title="Save this slide and publish every staged change to the screens"
+          >
+            Save &amp; publish
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">

@@ -6,6 +6,7 @@ import { auth } from '@/lib/auth/config';
 import { logAudit } from '@/lib/auth/session';
 import { getCurrentTenant } from '@/lib/tenant';
 import { itemToBodyHtml, IMPORT_COLLECTION_PREFIX } from '@/lib/import/parse-email';
+import { publishPlaylist } from '@/lib/publish';
 
 interface CreateItem {
   heading: string;
@@ -22,6 +23,7 @@ interface CreateBody {
   collectionName?: string;
   deactivatePrevious?: boolean;
   activate?: boolean;
+  publish?: boolean;
 }
 
 function dayAfterMorning(ymd: string): Date | null {
@@ -143,8 +145,14 @@ export async function POST(req: Request) {
     metadata: { collection: collectionName, created: created.length, deactivated },
   });
 
+  let published = false;
+  if (body.publish) {
+    await publishPlaylist(tenant.id, by, 'import');
+    published = true;
+  }
+
   return Response.json(
-    { ok: true, collectionId: collection.id, collectionName, created: created.length, deactivated },
+    { ok: true, collectionId: collection.id, collectionName, created: created.length, deactivated, published },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }

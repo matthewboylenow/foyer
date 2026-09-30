@@ -4,6 +4,7 @@ import { slides } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
 import { logAudit } from '@/lib/auth/session';
 import { getCurrentTenant } from '@/lib/tenant';
+import { publishPlaylist } from '@/lib/publish';
 export async function GET() {
   const tenant = await getCurrentTenant();
   if (!tenant) return Response.json([]);
@@ -90,6 +91,11 @@ export async function POST(req: Request) {
       collectionId: created.collectionId ?? null,
     },
   });
+
+  // A takeover must not wait for a publish click.
+  if (created.priority && created.active) {
+    await publishPlaylist(tenant.id, session?.user?.email ?? null, 'takeover');
+  }
 
   return Response.json(created, { status: 201 });
 }

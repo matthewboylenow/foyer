@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth/config';
 import { logAudit } from '@/lib/auth/session';
 import { getCurrentTenant } from '@/lib/tenant';
 import { diffObjects } from '@/lib/diff';
+import { publishPlaylist } from '@/lib/publish';
 
 export async function GET(
   _req: Request,
@@ -118,6 +119,11 @@ export async function PATCH(
         metadata: { changes, title: updated.title },
       });
     }
+  }
+
+  // A takeover going on or off must not wait for a publish click.
+  if (tenant && (updated.priority || existing.priority) && (updated.priority !== existing.priority || updated.active !== existing.active || updated.priority)) {
+    await publishPlaylist(tenant.id, session?.user?.email ?? null, 'takeover');
   }
 
   return Response.json(updated);

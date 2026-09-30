@@ -78,6 +78,13 @@
       "when": 1790790172450,
       "tag": "0010_v22_loop_pins",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790790699532,
+      "tag": "0011_v23_publish_snapshots",
+      "breakpoints": true
     }
   ]
 }

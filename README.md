@@ -113,6 +113,18 @@ run, and create them in a new "Email blast · <date>" collection; last week's
 email slides are turned off in the same step. Needs `ANTHROPIC_API_KEY` on the
 server. Headlines render at the small size only; the size picker is gone.
 
+## Publish to screens (staged edits)
+
+Edits on the Slides page and in the editor are staged. **Publish to screens**
+(the bar at the top of Slides, or "Save & publish" in the editor) copies every
+active slide into a `playlist_snapshots` row; the player serves the latest
+snapshot, still filtering dated slides by their own dates at serve time, so
+auto-expiry keeps working. Until the first publish there is no snapshot and
+the player serves the live rows (the pre-v23 behavior). The bar lists what
+differs between the admin and the screens. Takeover slides publish
+automatically when saved or toggled; the email import has a "publish right
+away" switch. Snapshot history is kept to the last 20.
+
 ## Loop order: pins
 
 Rotation is a weighted shuffle, except for pinned slides (`slides.pin`,

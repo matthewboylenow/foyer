@@ -223,6 +223,39 @@ export const slides = pgTable('slides', {
   updatedBy: text('updated_by'),
 });
 
+/**
+ * What the screens are playing. "Publish to screens" copies every active
+ * slide into a snapshot; the player serves the latest snapshot (filtered
+ * by schedule dates at serve time) so edits in the admin stay staged
+ * until the next publish. Before the first publish the player falls back
+ * to the live rows, which is how v1 through v22 behaved.
+ */
+export const playlistSnapshots = pgTable('playlist_snapshots', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  publishedAt: timestamp('published_at', { withTimezone: true }).defaultNow().notNull(),
+  publishedBy: text('published_by'),
+  /** Why this publish happened: 'manual' | 'takeover' | 'import' | 'editor' */
+  reason: text('reason').default('manual').notNull(),
+  /** md5 over every tenant slide's id:updatedAt at publish time — compared
+   *  against the live rows to show "N unpublished changes". */
+  sourceHash: text('source_hash').notNull(),
+  /** The active slides at publish time, full rows, dates as ISO strings. */
+  slides: jsonb('slides').$type<SnapshotSlide[]>().notNull(),
+  slideCount: integer('slide_count').default(0).notNull(),
+}, (t) => [index('playlist_snapshots_tenant_published_idx').on(t.tenantId, t.publishedAt)]);
+
+/** A slide row as stored inside a snapshot (timestamps serialized). */
+export type SnapshotSlide = Omit<
+  typeof slides.$inferSelect,
+  'startAt' | 'endAt' | 'createdAt' | 'updatedAt'
+> & {
+  startAt: string | null;
+  endAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 // Auth.js tables ──────────────────────────────────────────────────────────────
 
 export const users = pgTable('users', {
@@ -475,6 +508,7 @@ export type AgentCommand = 'reboot' | 'reload' | 'screenshot' | 'update';
 export type Tenant = typeof tenants.$inferSelect;
 export type Display = typeof displays.$inferSelect;
 export type DisplayEvent = typeof displayEvents.$inferSelect;
+export type PlaylistSnapshot = typeof playlistSnapshots.$inferSelect;
 export type Media = typeof media.$inferSelect;
 export type Settings = typeof settings.$inferSelect;
 export type Slide = typeof slides.$inferSelect;

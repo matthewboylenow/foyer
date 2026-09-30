@@ -24,6 +24,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { toast } from '@/lib/toast';
+import { notifySlidesChanged } from './PublishBar';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { templates } from '@/components/templates';
@@ -154,6 +155,7 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
       });
       if (!res.ok) throw new Error('Failed');
       toast.success('Order saved');
+      notifySlidesChanged();
     } catch {
       // Revert on failure.
       setSlides(slides);
@@ -171,6 +173,7 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
       });
       if (!res.ok) throw new Error('Failed');
       toast.success(current ? 'Slide deactivated' : 'Slide activated');
+      notifySlidesChanged();
     } catch {
       setSlides((prev) => prev.map((s) => (s.id === id ? { ...s, active: current } : s)));
       toast.error("Couldn't update slide");
@@ -189,6 +192,7 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
         return next;
       });
       toast.success('Slide deleted');
+      notifySlidesChanged();
     } catch {
       toast.error("Couldn't delete slide");
     }
@@ -212,6 +216,7 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
       const created = await res.json();
       setSlides((prev) => [created, ...prev]);
       toast.success('Slide duplicated');
+      notifySlidesChanged();
     } catch {
       toast.error("Couldn't duplicate slide");
     }
@@ -242,6 +247,7 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
         ),
       );
       toast.success(`${ids.length} ${makeActive ? 'activated' : 'deactivated'}`);
+      notifySlidesChanged();
       setSelected(new Set());
     } catch {
       toast.error("Couldn't update slides");
@@ -266,6 +272,7 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
           makeActive ? 'activated' : 'deactivated'
         }`,
       );
+      notifySlidesChanged();
     } catch {
       // Revert
       setSlides((prev) =>
@@ -285,6 +292,7 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
       setSlides((prev) => prev.filter((s) => !selected.has(s.id)));
       setSelected(new Set());
       toast.success(`${ids.length} deleted`);
+      notifySlidesChanged();
     } catch {
       toast.error("Couldn't delete slides");
     }
