@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { displays, displayEvents, playlistSnapshots, settings, slides, tenants } from '@/lib/db/schema';
+import { displays, displayEvents, playlistSnapshots, settings, slides, sourceItems, tenants } from '@/lib/db/schema';
 import type { AgentCommand, Display, DisplayEvent, Settings } from '@/lib/db/schema';
 import {
   OFFLINE_AFTER_SEC,
@@ -58,12 +58,26 @@ export async function computePlaylistVersion(displayId: string): Promise<string 
     ORDER BY ps.published_at DESC
     LIMIT 1
   ), 'live:' || coalesce(string_agg(${slides.id}::text || ':' || ${slides.updatedAt}::text, ',' ORDER BY ${slides.id}), ''))`;
+  // Source-managed items (WordPress) are live outside the snapshot, so
+  // their own fingerprint joins the version: id, revision, updated_at and
+  // the Foyer-side presentation fields, for every playable item right now.
+  const sourceTerm = sql<string>`coalesce((
+    SELECT string_agg(si.id::text || ':' || si.revision::text || ':' || si.updated_at::text, ',' ORDER BY si.id)
+    FROM ${sourceItems} si
+    WHERE si.tenant_id = ${displays.tenantId}
+      AND si.status = 'active' AND si.hidden = false
+      AND (
+        si.schedule_type <> 'dated'
+        OR ((si.start_at IS NULL OR si.start_at <= now()) AND (si.end_at IS NULL OR si.end_at >= now()))
+      )
+  ), '')`;
   const [row] = await db
     .select({
       version: sql<string>`md5(
         ${snapshotTerm}
         || '|' || ${displays.orientation} || '|' || ${displays.active}::text
         || '|' || coalesce(${settings.updatedAt}::text, '')
+        || '|src:' || ${sourceTerm}
       )`,
     })
     .from(displays)

@@ -85,6 +85,13 @@
       "when": 1790790699532,
       "tag": "0011_v23_publish_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791650932689,
+      "tag": "0012_v24_source_items",
+      "breakpoints": true
     }
   ]
 }

@@ -34,7 +34,11 @@ export default auth((req: NextRequest & { auth: unknown }) => {
       !pathname.startsWith('/api/auth') &&
       !pathname.startsWith('/api/otp') &&
       !pathname.startsWith('/api/errors') &&
-      !pathname.startsWith('/api/cron');
+      !pathname.startsWith('/api/cron') &&
+      // Server-to-server sync: no session; the route verifies an HMAC
+      // signature itself and refuses everything else. /api/sources/items
+      // (admin presentation edits) stays behind the session gate.
+      !pathname.startsWith('/api/sources/wordpress');
 
     if ((isAdminRoute || isProtectedApi) && !(req as { auth: unknown }).auth) {
       const url = new URL('/login', req.url);

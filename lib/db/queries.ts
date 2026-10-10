@@ -1,8 +1,9 @@
 import { eq, and, or, isNull, lte, gte, asc, desc } from 'drizzle-orm';
 import { db } from './client';
-import { slides, displays, settings, tenants, auditLog, errors, collections, media } from './schema';
+import { slides, displays, settings, tenants, auditLog, errors, collections, media, sourceItems } from './schema';
 import type { SlideWithContent, SlideContent, SlideOrientation, Slide } from './schema';
 import { getLatestSnapshot, isWithinSchedule } from '@/lib/publish';
+import { isSourceItemPlayable } from '@/lib/sources/playable';
 
 /**
  * Picks the orientation-appropriate content slot for a slide and reports
@@ -70,6 +71,42 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
         ),
       ),
       orderBy: [desc(slides.updatedAt)],
+    });
+  }
+
+  // Source-managed items (WordPress) merge in here, as slide-shaped rows.
+  // They bypass staging/publish by design: the source already approved
+  // them. Presentation columns (pin, weight, duration, hidden, targets)
+  // are Foyer's. Their ids are the source_items row ids.
+  const externalImages = new Map<string, string>();
+  const sourceRows = await db.query.sourceItems.findMany({
+    where: and(eq(sourceItems.tenantId, display.tenantId), eq(sourceItems.status, 'active'), eq(sourceItems.hidden, false)),
+  });
+  for (const si of sourceRows) {
+    if (!isSourceItemPlayable(si, now)) continue;
+    if (si.imageUrl) externalImages.set(si.id, si.imageUrl);
+    eligible.push({
+      id: si.id,
+      tenantId: si.tenantId,
+      templateType: si.templateType,
+      title: si.title,
+      content: si.content,
+      contentLandscape: null,
+      scheduleType: si.scheduleType,
+      startAt: si.startAt,
+      endAt: si.endAt,
+      targetDisplays: si.targetDisplays,
+      active: true,
+      priority: false,
+      pin: si.pin,
+      weight: si.weight,
+      durationOverrideSec: si.durationOverrideSec,
+      collectionId: null,
+      displayOrder: 0,
+      createdAt: si.createdAt,
+      updatedAt: si.updatedAt,
+      createdBy: `source:${si.source}`,
+      updatedBy: `source:${si.source}`,
     });
   }
 
@@ -141,6 +178,9 @@ export async function getEligibleSlides(displayId: string): Promise<EligibleSlid
       const url = mediaMap.get(c.imageMediaId);
       if (url) resolved.imageUrl = url;
     }
+    // Source items carry a public image URL instead of a media id.
+    const external = externalImages.get(s.id);
+    if (external) resolved.imageUrl = external;
     // Strip contentLandscape from the returned shape and replace content
     // with the orientation-resolved effective content.
     const { content: _origContent, contentLandscape: _origLandscape, _effective, ...rest } = s;

@@ -8,6 +8,7 @@ import {
   timestamp,
   jsonb,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
@@ -255,6 +256,76 @@ export type SnapshotSlide = Omit<
   createdAt: string;
   updatedAt: string;
 };
+
+/**
+ * Source-managed content: items whose editorial content is owned by an
+ * external system (WordPress) and delivered over the signed sync endpoint
+ * (app/api/sources/wordpress). They are NOT slides: Foyer slides are
+ * authored here and go through staging + publish; source items go live
+ * as soon as the source says they are approved, and are merged into the
+ * player's eligible set at serve time (lib/db/queries.ts). The sync
+ * writes only the editorial columns; the presentation columns below the
+ * divider are Foyer-owned and survive every resync.
+ */
+export const sourceItems = pgTable('source_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  /** 'wordpress' for now; the unique key is (tenant, source, sourceId). */
+  source: text('source').notNull(),
+  sourceId: text('source_id').notNull(),
+  /** Monotonic per item on the source side (WordPress post modified time
+   *  as epoch seconds, or a revision counter). Older revisions are ignored. */
+  revision: integer('revision').default(0).notNull(),
+  /** 'active' plays (subject to schedule); 'withdrawn' never plays but is
+   *  kept so a later re-delivery can revive it and the admin can see it. */
+  status: text('status').default('active').notNull(),
+  kind: text('kind').default('announcement').notNull(),
+  templateType: slideTemplateEnum('template_type').notNull(),
+  title: text('title').notNull(),
+  /** Built by lib/sources/wordpress.ts from the delivered fields; same
+   *  shape the matching template expects (GeneralContent / PosterContent). */
+  content: jsonb('content').notNull().default({}),
+  /** Public (https) image for the poster template; never a Blob upload. */
+  imageUrl: text('image_url'),
+  scheduleType: scheduleTypeEnum('schedule_type').default('evergreen').notNull(),
+  startAt: timestamp('start_at', { withTimezone: true }),
+  endAt: timestamp('end_at', { withTimezone: true }),
+  sourceUrl: text('source_url'),
+  sourceUpdatedAt: timestamp('source_updated_at', { withTimezone: true }),
+  /** md5 of the normalized editorial payload; equal hash = no-op resync. */
+  payloadHash: text('payload_hash').notNull(),
+  lastReceivedAt: timestamp('last_received_at', { withTimezone: true }).defaultNow().notNull(),
+  lastError: text('last_error'),
+  // ── Foyer-owned presentation (never touched by the sync) ──────────────
+  hidden: boolean('hidden').default(false).notNull(),
+  weight: integer('weight').default(1).notNull(),
+  durationOverrideSec: integer('duration_override_sec'),
+  pin: text('pin'),
+  targetDisplays: jsonb('target_displays').default([]).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('source_items_tenant_source_id_idx').on(t.tenantId, t.source, t.sourceId),
+  index('source_items_tenant_status_idx').on(t.tenantId, t.status),
+]);
+
+/** One row per inbound delivery, for diagnosing the sync without logging
+ *  payload bodies or secrets. */
+export const sourceDeliveries = pgTable('source_deliveries', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').references(() => tenants.id),
+  source: text('source').notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).defaultNow().notNull(),
+  ok: boolean('ok').default(false).notNull(),
+  /** 'accepted' | 'bad_signature' | 'stale_timestamp' | 'bad_payload' | 'tenant_mismatch' | 'error' */
+  outcome: text('outcome').notNull(),
+  itemCount: integer('item_count').default(0).notNull(),
+  /** Per-item actions: { created, updated, unchanged, stale, withdrawn, rejected } */
+  summary: jsonb('summary').$type<Record<string, number>>().default({}),
+  error: text('error'),
+  /** Client-supplied delivery id (for their retry bookkeeping), if any. */
+  deliveryId: text('delivery_id'),
+}, (t) => [index('source_deliveries_tenant_received_idx').on(t.tenantId, t.receivedAt)]);
 
 // Auth.js tables ──────────────────────────────────────────────────────────────
 
@@ -509,6 +580,8 @@ export type Tenant = typeof tenants.$inferSelect;
 export type Display = typeof displays.$inferSelect;
 export type DisplayEvent = typeof displayEvents.$inferSelect;
 export type PlaylistSnapshot = typeof playlistSnapshots.$inferSelect;
+export type SourceItem = typeof sourceItems.$inferSelect;
+export type SourceDelivery = typeof sourceDeliveries.$inferSelect;
 export type Media = typeof media.$inferSelect;
 export type Settings = typeof settings.$inferSelect;
 export type Slide = typeof slides.$inferSelect;

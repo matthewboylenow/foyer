@@ -8,6 +8,7 @@ import {
   LayoutGrid,
   Mail,
   CalendarCheck,
+  Globe,
   CalendarDays,
   Monitor,
   Activity,
@@ -31,6 +32,7 @@ interface NavLink {
     | '/admin/weekly'
     | '/admin/slides'
     | '/admin/import'
+    | '/admin/sources'
     | '/admin/schedule'
     | '/admin/displays'
     | '/admin/media'
@@ -45,6 +47,7 @@ const NAV_LINKS: NavLink[] = [
   { href: '/admin/weekly', label: 'This week', icon: CalendarCheck },
   { href: '/admin/slides', label: 'Slides', icon: LayoutGrid },
   { href: '/admin/import', label: 'Email import', icon: Mail },
+  { href: '/admin/sources', label: 'From WordPress', icon: Globe },
   { href: '/admin/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/admin/displays', label: 'Displays', icon: Monitor },
   { href: '/admin/media', label: 'Library', icon: Images },
