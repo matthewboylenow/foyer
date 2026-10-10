@@ -58,7 +58,7 @@ export default async function EditSlidePage({
       templateType={slide.templateType as TemplateKey}
       initialSlide={slide as SlideWithContent}
       tenantLogoUrl={tenantLogoUrl}
-      displays={displays.map((d) => ({ id: d.id, name: d.name }))}
+      displays={displays.map((d) => ({ id: d.id, name: d.name, orientation: d.orientation }))}
       collections={collections}
       initialMedia={{ portrait: portraitMedia, landscape: landscapeMedia }}
     />

@@ -39,7 +39,7 @@ interface SlideEditorProps {
   templateType: TemplateKey;
   initialSlide: SlideWithContent | null;
   tenantLogoUrl?: string | null;
-  displays?: { id: string; name: string }[];
+  displays?: { id: string; name: string; orientation?: string }[];
   collections?: Collection[];
   initialMedia?: {
     portrait?: OrientationMedia;
@@ -344,7 +344,10 @@ export function SlideEditor({
             />
           </div>
 
-          {/* Orientation tabs — switch which orientation's content the form edits. */}
+          {/* Orientation tabs — only when there is something to switch to:
+              a landscape screen exists, or this slide already has a
+              landscape version. Portrait-only parishes never see them. */}
+          {(landscapeHas || displays.some((d) => d.orientation === 'landscape')) && (
           <OrientationTabs
             active={activeOrientation}
             onChange={setActiveOrientation}
@@ -389,6 +392,7 @@ export function SlideEditor({
               setActiveOrientation('landscape');
             }}
           />
+          )}
 
           {/* Template-specific fields — bound to the active orientation. */}
           {(activeOrientation === 'portrait' ? portraitHas : landscapeHas) ? (

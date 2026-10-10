@@ -24,7 +24,7 @@ export default async function NewSlideByTemplatePage({
       templateType={templateType as TemplateKey}
       initialSlide={null}
       tenantLogoUrl={tenantLogoUrl}
-      displays={displays.map((d) => ({ id: d.id, name: d.name }))}
+      displays={displays.map((d) => ({ id: d.id, name: d.name, orientation: d.orientation }))}
       collections={collections}
     />
   );
