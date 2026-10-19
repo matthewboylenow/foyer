@@ -14,12 +14,8 @@ export default async function SlidesPage() {
 
   return (
     <div>
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="font-serif text-3xl font-bold text-navy leading-none">Slides</h1>
-        <p className="mt-2 text-sm text-navy/55">
-          Drag cards to reorder. Edits, toggles and new slides are staged here until you
-          publish; then every screen switches to the new set within a minute.
-        </p>
       </div>
       <div className="mb-6">
         <PublishBar />

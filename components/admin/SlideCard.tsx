@@ -1,15 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { TimeAgo } from './TimeAgo';
-import {
-  MoreHorizontal,
-  GripVertical,
-  Calendar,
-  CheckCircle2,
-  RectangleVertical,
-  RectangleHorizontal,
-} from 'lucide-react';
+import { MoreHorizontal, GripVertical, CheckCircle2, RectangleVertical, RectangleHorizontal } from 'lucide-react';
 import { templates } from '@/components/templates';
 import {
   DropdownMenu,
@@ -20,10 +12,6 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { COLLECTION_COLORS } from './CollectionPicker';
 import type { Slide, SlideContent, Collection } from '@/lib/db/schema';
-
-const TEMPLATE_LABELS: Record<string, string> = Object.fromEntries(
-  Object.entries(templates).map(([k, v]) => [k, v.label]),
-);
 
 // Card geometry — kept fixed so the preview scale calc is deterministic.
 // Cards are always 240px wide; thumb height varies with the orientation
@@ -100,12 +88,18 @@ export function SlideCard({
   const nativeH = previewOrientation === 'portrait' ? 1920 : 1080;
   const thumbH = previewOrientation === 'portrait' ? PORTRAIT_THUMB_H : LANDSCAPE_THUMB_H;
   const thumbScale = CARD_W / nativeW;
+  const fmt = (d: Date | string) =>
+    new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const scheduleLabel =
     slide.scheduleType === 'evergreen'
-      ? 'Evergreen'
-      : `${slide.startAt ? new Date(slide.startAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '…'} → ${
-          slide.endAt ? new Date(slide.endAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '∞'
-        }`;
+      ? ''
+      : slide.startAt && slide.endAt
+        ? `${fmt(slide.startAt)} to ${fmt(slide.endAt)}`
+        : slide.endAt
+          ? `until ${fmt(slide.endAt)}`
+          : slide.startAt
+            ? `from ${fmt(slide.startAt)}`
+            : '';
 
   return (
     <div
@@ -183,7 +177,7 @@ export function SlideCard({
         {!slide.active && (
           <div className="absolute inset-0 bg-ink/60 backdrop-blur-[2px] flex items-center justify-center">
             <span className="text-cream/90 text-xs uppercase tracking-widest font-medium">
-              Inactive
+              Off
             </span>
           </div>
         )}
@@ -222,46 +216,31 @@ export function SlideCard({
           </DropdownMenu>
         </div>
 
-        <div className="flex items-center justify-between gap-2 text-[11px]">
+        <div className="flex items-center justify-between gap-2 text-[11px] text-navy/55">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="font-mono uppercase tracking-widest text-navy/50 truncate">
-              {TEMPLATE_LABELS[slide.templateType] ?? slide.templateType}
-            </span>
-            <OrientationPill portrait={portraitAuthored} landscape={landscapeAuthored} />
+            {(slide.pin === 'start' || slide.pin === 'end') && (
+              <span className="shrink-0 text-[9px] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded bg-navy text-cream">
+                {slide.pin === 'start' ? 'Loop start' : 'Loop end'}
+              </span>
+            )}
+            {slide.priority && (
+              <span className="shrink-0 text-[9px] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded bg-rust text-cream">
+                Takeover
+              </span>
+            )}
+            {slide.scheduleType !== 'evergreen' && <span className="truncate">{scheduleLabel}</span>}
+            {collection && collectionSwatch && (
+              <span className="inline-flex items-center gap-1 min-w-0" title={collection.name}>
+                <span className={`size-2 rounded-full shrink-0 ${collectionSwatch.bg}`} aria-hidden />
+                <span className="truncate">{collection.name}</span>
+              </span>
+            )}
           </div>
           <Switch
             checked={slide.active}
             onCheckedChange={() => onActiveToggle(slide.id, slide.active)}
-            className="scale-75 origin-right"
-            aria-label={slide.active ? 'Deactivate' : 'Activate'}
-          />
-        </div>
-
-        {collection && collectionSwatch && (
-          <div className="mt-2 inline-flex items-center gap-1.5 text-[10px]">
-            <span className={`size-2 rounded-full ${collectionSwatch.bg}`} aria-hidden />
-            <span className="font-medium text-navy/65 truncate" title={collection.name}>
-              {collection.name}
-            </span>
-          </div>
-        )}
-
-        <div className="flex items-center gap-2 mt-2 text-[11px] text-navy/55">
-          <Calendar size={11} className="shrink-0" />
-          {(slide.pin === 'start' || slide.pin === 'end') && (
-            <span className="shrink-0 text-[9px] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded bg-navy text-cream">
-              {slide.pin === 'start' ? 'Loop start' : 'Loop end'}
-            </span>
-          )}
-          {slide.priority && (
-            <span className="shrink-0 text-[9px] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded bg-rust text-cream">
-              Takeover
-            </span>
-          )}
-          <span className="truncate">{scheduleLabel}</span>
-          <TimeAgo
-            date={slide.updatedAt}
-            className="ml-auto shrink-0 font-mono text-navy/40"
+            className="scale-75 origin-right shrink-0"
+            aria-label={slide.active ? 'Turn off' : 'Turn on'}
           />
         </div>
       </div>

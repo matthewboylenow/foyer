@@ -485,9 +485,6 @@ export function SlideEditor({
                 No {activeOrientation === 'portrait' ? 'vertical' : 'horizontal'} version yet.
               </div>
             )}
-            <p className="text-[11px] text-muted-foreground mt-2">
-              Live preview. Animations replay 500ms after you stop typing.
-            </p>
           </div>
 
           {/* Active toggle */}
@@ -509,25 +506,12 @@ export function SlideEditor({
             </div>
           )}
 
-          {/* Takeover */}
-          <div className={`p-4 border rounded-lg space-y-2 ${priority ? 'border-rust bg-rust/5' : 'border-border'}`}>
-            <div className="flex items-center gap-3">
-              <Switch checked={priority} onCheckedChange={setPriority} />
-              <Label className={priority ? 'text-rust font-semibold' : ''}>Takeover</Label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              While this slide is on (and within its dates), the TVs show only takeover
-              slides — nothing else. For a funeral notice, a weather closure, an emergency
-              message. Turn it off to resume the normal rotation.
-            </p>
-          </div>
-
           {/* Position in the loop */}
           <div className="p-4 border border-border rounded-lg space-y-3">
             <h3 className="font-medium text-sm">Where in the loop</h3>
             <div className="flex flex-col gap-2">
               {([
-                [null, 'Anywhere (shuffled with the other announcements)'],
+                [null, 'Anywhere in the shuffle'],
                 ['start', 'Start of every loop'],
                 ['end', 'End of every loop'],
               ] as const).map(([value, label]) => (
@@ -544,9 +528,7 @@ export function SlideEditor({
               ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              Pinned slides play once per loop in the order they sit on the Slides page (drag
-              to reorder). Use this for Welcome at the start and Mass intentions, Mass
-              association and the Sanctuary candle at the end.
+              Pinned slides play once per loop, in Slides-page order.
             </p>
           </div>
 
@@ -605,13 +587,33 @@ export function SlideEditor({
             )}
           </div>
 
+          {/* Rarely needed: tucked away so the common path stays short. */}
+          <details className="group rounded-lg border border-border" open={priority || targetDisplays.length > 0}>
+            <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium flex items-center justify-between">
+              More options
+              <span className="text-xs text-muted-foreground font-normal">
+                {[priority && 'takeover', collectionId && 'collection', targetDisplays.length > 0 && 'some TVs']
+                  .filter(Boolean)
+                  .join(' · ') || 'takeover, how often, collection, which TVs'}
+              </span>
+            </summary>
+            <div className="px-4 pb-4 space-y-6 border-t border-border pt-4">
+          {/* Takeover */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <Switch checked={priority} onCheckedChange={setPriority} />
+              <Label className={priority ? 'text-rust font-semibold' : ''}>Takeover</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Only takeover slides play while this is on. For a funeral notice or a weather closure.
+            </p>
+          </div>
+
           {/* Weight + duration */}
-          <div className="p-4 border border-border rounded-lg space-y-4">
+          <div className="space-y-4">
             <h3 className="font-medium text-sm">How often & how long</h3>
             <div className="space-y-1">
-              <Label className="text-xs">
-                How often to show (1 = normal, 2 = twice as often, 0 = off)
-              </Label>
+              <Label className="text-xs">How often (1 = normal, 2 = twice as often)</Label>
               <div className="flex items-center gap-3">
                 <input
                   type="range"
@@ -626,9 +628,7 @@ export function SlideEditor({
               </div>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">
-                Time on screen (seconds) — leave blank to use the default of {templateConfig.defaultDurationSec}s
-              </Label>
+              <Label className="text-xs">Seconds on screen (default {templateConfig.defaultDurationSec})</Label>
               <Input
                 type="number"
                 min="5"
@@ -641,7 +641,7 @@ export function SlideEditor({
           </div>
 
           {/* Collection assignment — bundle slides into seasonal/editorial packs */}
-          <div className="p-4 border border-border rounded-lg space-y-3">
+          <div className="space-y-3">
             <h3 className="font-medium text-sm">Collection</h3>
             <CollectionPicker
               collections={collections}
@@ -653,7 +653,7 @@ export function SlideEditor({
 
           {/* Per-display targeting */}
           {displays.length > 0 && (
-            <div className="p-4 border border-border rounded-lg space-y-3">
+            <div className="space-y-3">
               <h3 className="font-medium text-sm">Which TVs</h3>
               <p className="text-xs text-muted-foreground">
                 Leave everything unchecked to show on every TV.
@@ -689,6 +689,8 @@ export function SlideEditor({
               )}
             </div>
           )}
+            </div>
+          </details>
 
         </div>
       </div>

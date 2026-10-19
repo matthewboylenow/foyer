@@ -39,10 +39,6 @@ export default async function WeeklyPage() {
     <div>
       <div className="mb-6">
         <h1 className="font-serif text-3xl font-bold text-navy leading-none">This week</h1>
-        <p className="mt-2 text-sm text-navy/55">
-          The three parish slides in one place. Paste from the bulletin, check the previews,
-          press one button.
-        </p>
       </div>
       <WeeklyParishForm
         slides={{ intentions, association, candle }}

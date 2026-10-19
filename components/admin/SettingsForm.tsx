@@ -56,7 +56,7 @@ export function SettingsForm({ settings }: SettingsFormProps) {
 
       <div className="flex items-center gap-3">
         <Switch checked={videoEnabled} onCheckedChange={setVideoEnabled} disabled />
-        <Label className="text-muted-foreground">Video enabled (v1 — no video uploads yet)</Label>
+        <Label className="text-muted-foreground">Video backgrounds (no uploads yet)</Label>
       </div>
 
       <Button onClick={handleSave} disabled={saving} className="bg-navy text-cream">

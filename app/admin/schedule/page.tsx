@@ -21,12 +21,8 @@ export default async function SchedulePage() {
 
   return (
     <div>
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="font-serif text-3xl font-bold text-navy leading-none">Schedule</h1>
-        <p className="mt-2 text-sm text-navy/55">
-          What&apos;s playing when. Dated slides appear as bars across the next eight weeks;
-          evergreen slides play continuously above. Click any bar to edit.
-        </p>
       </div>
       <ScheduleTimeline slides={slideRows} collections={collections} />
     </div>

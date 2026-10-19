@@ -41,21 +41,54 @@ interface NavLink {
   icon: React.ComponentType<{ size?: number; className?: string }>;
 }
 
-const NAV_LINKS: NavLink[] = [
+const PRIMARY: NavLink[] = [
   { href: '/admin/weekly', label: 'This week', icon: CalendarCheck },
-  { href: '/admin/slides', label: 'Slides', icon: LayoutGrid },
   { href: '/admin/import', label: 'Email import', icon: Mail },
-  { href: '/admin/schedule', label: 'Schedule', icon: CalendarDays },
+  { href: '/admin/slides', label: 'Slides', icon: LayoutGrid },
   { href: '/admin/displays', label: 'Displays', icon: Monitor },
+];
+
+const SECONDARY: NavLink[] = [
+  { href: '/admin/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/admin/media', label: 'Library', icon: Images },
   { href: '/admin/audit', label: 'Activity', icon: Activity },
   { href: '/admin/users', label: 'Users', icon: UsersIcon },
   { href: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
+const NAV_LINKS: NavLink[] = [...PRIMARY, ...SECONDARY];
+
 interface AdminNavProps {
   user: { name?: string | null; email?: string | null; image?: string | null } | null;
   isSuperAdmin?: boolean;
+}
+
+function NavGroup({ links, pathname, muted = false }: { links: NavLink[]; pathname: string; muted?: boolean }) {
+  return (
+    <div className="space-y-0.5">
+      {links.map((link) => {
+        const active = pathname.startsWith(link.href);
+        const Icon = link.icon;
+        return (
+          <Link
+            key={link.href}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            href={link.href as any}
+            className={`flex items-center gap-3 px-3 rounded-lg transition-colors ${muted ? 'py-1.5 text-[13px]' : 'py-2 text-sm'} ${
+              active
+                ? 'bg-cream text-navy font-semibold shadow-sm'
+                : muted
+                  ? 'text-cream/55 hover:text-cream hover:bg-cream/5'
+                  : 'text-cream/80 hover:text-cream hover:bg-cream/5'
+            }`}
+          >
+            <Icon size={muted ? 14 : 16} className={active ? 'text-rust' : muted ? 'text-cream/40' : 'text-cream/60'} />
+            <span>{link.label}</span>
+          </Link>
+        );
+      })}
+    </div>
+  );
 }
 
 export function AdminNav({ user, isSuperAdmin = false }: AdminNavProps) {
@@ -69,7 +102,7 @@ export function AdminNav({ user, isSuperAdmin = false }: AdminNavProps) {
         <div className="px-6 pt-7 pb-5">
           <Link
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            href={'/admin/slides' as any}
+            href={'/admin/weekly' as any}
             className="block font-serif text-cream font-bold text-2xl tracking-tight leading-none"
           >
             Foyer
@@ -83,26 +116,10 @@ export function AdminNav({ user, isSuperAdmin = false }: AdminNavProps) {
           <div className="h-px bg-gold/15 mx-3" />
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {NAV_LINKS.map((link) => {
-            const active = pathname.startsWith(link.href);
-            const Icon = link.icon;
-            return (
-              <Link
-                key={link.href}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                href={link.href as any}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  active
-                    ? 'bg-cream text-navy font-semibold shadow-sm'
-                    : 'text-cream/75 hover:text-cream hover:bg-cream/5'
-                }`}
-              >
-                <Icon size={16} className={active ? 'text-rust' : 'text-cream/55'} />
-                <span>{link.label}</span>
-              </Link>
-            );
-          })}
+        <nav className="flex-1 px-3 py-4">
+          <NavGroup links={PRIMARY} pathname={pathname} />
+          <div className="h-px bg-cream/10 mx-3 my-4" />
+          <NavGroup links={SECONDARY} pathname={pathname} muted />
         </nav>
 
         <div className="px-3 pb-6">
@@ -144,7 +161,7 @@ export function AdminNav({ user, isSuperAdmin = false }: AdminNavProps) {
         <div className="flex items-center h-14 px-4 gap-4">
           <Link
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            href={'/admin/slides' as any}
+            href={'/admin/weekly' as any}
             className="font-serif text-cream font-bold text-xl"
           >
             Foyer

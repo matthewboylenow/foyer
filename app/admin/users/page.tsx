@@ -25,12 +25,8 @@ export default async function UsersPage() {
 
   return (
     <div className="max-w-3xl">
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="font-serif text-3xl font-bold text-navy leading-none">Users</h1>
-        <p className="mt-2 text-sm text-navy/55">
-          Who can sign in to this tenant. Anyone at the staff domain gets in automatically;
-          others need an explicit invite below.
-        </p>
       </div>
       <UsersList
         users={users.map((u) => ({

@@ -38,6 +38,7 @@ interface SlideGridProps {
 }
 
 type StatusFilter = 'all' | 'active' | 'inactive';
+const STATUS_LABELS: Record<StatusFilter, string> = { active: 'On', inactive: 'Off', all: 'All' };
 type OrientationFilter = 'all' | 'vertical' | 'horizontal';
 
 function slideHasPortrait(s: SlideCardData): boolean {
@@ -58,7 +59,7 @@ const TEMPLATE_LABELS = Object.fromEntries(
 export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGridProps) {
   const router = useRouter();
   const [slides, setSlides] = useState<SlideCardData[]>(initialSlides);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [orientationFilter, setOrientationFilter] = useState<OrientationFilter>('all');
   const [collectionFilter, setCollectionFilter] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -304,8 +305,7 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
         <div className="text-5xl mb-3 font-serif text-navy/30">∅</div>
         <p className="font-serif text-2xl text-navy mb-2">No slides yet</p>
         <p className="text-navy/60 mb-6 max-w-md mx-auto">
-          Build your first slide — start with a Parish Identity headline, or paste in this week&apos;s
-          Mass intentions.
+          Start with a Parish Identity slide, or paste in this week&apos;s Mass intentions.
         </p>
         <Link
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -329,7 +329,7 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
           </span>
           <span>
             {slides.filter((s) => s.active && s.priority).map((s) => s.title || 'Untitled').join(', ')}
-            {' '}— the TVs show only these until the takeover is turned off or expires.
+            {' '}are the only slides on the TVs until the takeover is turned off or expires.
           </span>
         </div>
       )}
@@ -337,17 +337,17 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
       {/* Filter + search row */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex gap-1.5 p-1 rounded-lg bg-navy/5 border border-navy/10">
-          {(['all', 'active', 'inactive'] as const).map((f) => (
+          {(['active', 'inactive', 'all'] as const).map((f) => (
             <button
               key={f}
               onClick={() => setStatusFilter(f)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium capitalize transition-colors ${
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 statusFilter === f
                   ? 'bg-cream text-navy shadow-sm'
                   : 'text-navy/60 hover:text-navy'
               }`}
             >
-              {f}
+              {STATUS_LABELS[f]}
               <span className="ml-1.5 font-mono text-[11px] text-navy/40">{counts[f]}</span>
             </button>
           ))}
@@ -411,7 +411,7 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search title or template…"
+            placeholder="Search…"
             className="w-full pl-9 pr-9 py-2 text-sm rounded-lg border border-navy/15 bg-cream focus:outline-none focus:border-navy focus:ring-2 focus:ring-rust/20"
           />
           {query && (
@@ -529,8 +529,15 @@ export function SlideGrid({ slides: initialSlides, collections = [] }: SlideGrid
       {/* Grid */}
       {filtered.length === 0 ? (
         <div className="text-center py-16 text-navy/50">
-          No {statusFilter === 'all' ? '' : statusFilter} slides match{' '}
-          {query ? <span className="text-navy">&ldquo;{query}&rdquo;</span> : 'this filter'}.
+          {query ? (
+            <>No slides match <span className="text-navy">&ldquo;{query}&rdquo;</span>.</>
+          ) : statusFilter === 'active' ? (
+            'No slides are on.'
+          ) : statusFilter === 'inactive' ? (
+            'Every slide is on.'
+          ) : (
+            'No slides match this filter.'
+          )}
         </div>
       ) : (
         <DndContext

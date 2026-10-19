@@ -41,7 +41,7 @@ export function ActiveToggle({ slideId, initialActive, onToggle }: ActiveToggleP
     <div className="flex items-center gap-3">
       <Switch checked={active} onCheckedChange={handleChange} disabled={pending} />
       <Label className="cursor-pointer select-none">
-        {active ? 'On — showing on TVs' : 'Off — hidden from TVs'}
+        {active ? 'Showing on TVs' : 'Off, not on TVs'}
       </Label>
     </div>
   );

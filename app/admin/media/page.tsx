@@ -17,12 +17,8 @@ export default async function MediaPage() {
 
   return (
     <div>
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="font-serif text-3xl font-bold text-navy leading-none">Library</h1>
-        <p className="mt-2 text-sm text-navy/55">
-          Every image you&apos;ve uploaded. Reuse anything here on a slide instead of re-uploading,
-          and clean up files you no longer need.
-        </p>
       </div>
       <MediaLibrary
         initialItems={items.map((m) => ({

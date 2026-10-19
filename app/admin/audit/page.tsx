@@ -20,12 +20,8 @@ export default async function AuditPage() {
 
   return (
     <div>
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="font-serif text-3xl font-bold text-navy leading-none">Activity</h1>
-        <p className="mt-2 text-sm text-navy/55">
-          Recent changes to slides and collections. Expand a row to see field-by-field
-          diffs. Last 200 entries.
-        </p>
       </div>
       <AuditList
         entries={entries.map((e) => ({
