@@ -34,7 +34,10 @@ export default auth((req: NextRequest & { auth: unknown }) => {
       !pathname.startsWith('/api/auth') &&
       !pathname.startsWith('/api/otp') &&
       !pathname.startsWith('/api/errors') &&
-      !pathname.startsWith('/api/cron');
+      !pathname.startsWith('/api/cron') &&
+      // Token-authenticated, server-to-server (see their route files).
+      !pathname.startsWith('/api/mcp') &&
+      !pathname.startsWith('/api/ingest');
 
     if ((isAdminRoute || isProtectedApi) && !(req as { auth: unknown }).auth) {
       const url = new URL('/login', req.url);

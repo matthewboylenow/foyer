@@ -8,7 +8,9 @@ import {
   timestamp,
   jsonb,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
@@ -221,7 +223,16 @@ export const slides = pgTable('slides', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   createdBy: text('created_by'),
   updatedBy: text('updated_by'),
-});
+  /** Set when an outside system owns this slide: "<source>:<id in that
+   *  system>", e.g. "comms-portal:req_123". Lets POST /api/ingest and the
+   *  MCP server upsert instead of duplicating, and prune by source. Null
+   *  for slides made in the admin. */
+  sourceId: text('source_id'),
+}, (t) => [
+  uniqueIndex('slides_tenant_source_id_uq')
+    .on(t.tenantId, t.sourceId)
+    .where(sql`${t.sourceId} is not null`),
+]);
 
 /**
  * What the screens are playing. "Publish to screens" copies every active

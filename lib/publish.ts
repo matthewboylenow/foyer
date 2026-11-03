@@ -13,7 +13,7 @@ import type { PlaylistSnapshot, Slide, SnapshotSlide } from '@/lib/db/schema';
  * publish there is no snapshot and the player serves the live rows.
  */
 
-export type PublishReason = 'manual' | 'takeover' | 'import' | 'editor';
+export type PublishReason = 'manual' | 'takeover' | 'import' | 'editor' | 'ingest' | 'mcp';
 
 const KEEP_SNAPSHOTS = 20;
 

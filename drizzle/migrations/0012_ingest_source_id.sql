@@ -1,0 +1,2 @@
+ALTER TABLE "slides" ADD COLUMN "source_id" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "slides_tenant_source_id_uq" ON "slides" USING btree ("tenant_id","source_id") WHERE "slides"."source_id" is not null;
