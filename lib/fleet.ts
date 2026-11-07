@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { displays, displayEvents, playlistSnapshots, settings, slides, tenants } from '@/lib/db/schema';
 import type { AgentCommand, Display, DisplayEvent, Settings } from '@/lib/db/schema';
@@ -185,9 +185,68 @@ export async function getRecentEvents(displayId: string, limit = 12): Promise<Di
   return db
     .select()
     .from(displayEvents)
-    .where(eq(displayEvents.displayId, displayId))
+    .where(and(eq(displayEvents.displayId, displayId), ne(displayEvents.kind, 'load')))
     .orderBy(desc(displayEvents.at))
     .limit(limit);
+}
+
+// ─── Page loads ──────────────────────────────────────────────────────────────
+
+/** Keep page-load events this long; older ones are pruned by the cron. */
+export const LOAD_EVENT_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
+
+/**
+ * The player page started fresh: its first playlist fetch carries no
+ * If-None-Match. Counting these per day tells us whether a kiosk is
+ * reloading the page on its own (and re-downloading every background
+ * image and video each time), which no amount of in-page caching fixes.
+ */
+export async function recordPageLoad(
+  display: Pick<Display, 'id' | 'tenantId'>,
+  userAgent: string | null,
+): Promise<void> {
+  await db.insert(displayEvents).values({
+    tenantId: display.tenantId,
+    displayId: display.id,
+    kind: 'load',
+    meta: { userAgent: userAgent ? userAgent.slice(0, 200) : null },
+  });
+}
+
+export interface LoadStats {
+  /** Fresh page loads in the window. */
+  count: number;
+  lastAt: Date | null;
+  lastUserAgent: string | null;
+}
+
+export async function getLoadStats(displayId: string, windowMs: number, now = Date.now()): Promise<LoadStats> {
+  const from = new Date(now - windowMs);
+  const [agg] = await db
+    .select({ n: count() })
+    .from(displayEvents)
+    .where(and(eq(displayEvents.displayId, displayId), eq(displayEvents.kind, 'load'), gte(displayEvents.at, from)));
+  const [last] = await db
+    .select({ at: displayEvents.at, meta: displayEvents.meta })
+    .from(displayEvents)
+    .where(and(eq(displayEvents.displayId, displayId), eq(displayEvents.kind, 'load')))
+    .orderBy(desc(displayEvents.at))
+    .limit(1);
+  const ua = (last?.meta as { userAgent?: unknown } | null)?.userAgent;
+  return {
+    count: Number(agg?.n ?? 0),
+    lastAt: last?.at ? new Date(last.at) : null,
+    lastUserAgent: typeof ua === 'string' ? ua : null,
+  };
+}
+
+export async function pruneLoadEvents(now = new Date()): Promise<number> {
+  const cutoff = new Date(now.getTime() - LOAD_EVENT_RETENTION_MS);
+  const rows = await db
+    .delete(displayEvents)
+    .where(and(eq(displayEvents.kind, 'load'), lt(displayEvents.at, cutoff)))
+    .returning({ id: displayEvents.id });
+  return rows.length;
 }
 
 // ─── Commands ────────────────────────────────────────────────────────────────
@@ -293,6 +352,7 @@ export async function runDisplayCheck(now = new Date()): Promise<{ checked: numb
   const all = await db.query.displays.findMany({ where: eq(displays.active, true) });
   let newOutages = 0;
   let alerted = 0;
+  await pruneLoadEvents(now).catch((err) => console.error('[fleet] prune load events failed', err));
 
   const settingsByTenant = new Map<string, Settings | undefined>();
 

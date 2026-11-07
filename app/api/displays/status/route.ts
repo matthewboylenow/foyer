@@ -4,7 +4,7 @@ import { displays, slides, media, settings, type SlideWithContent } from '@/lib/
 import type { AgentInfo, DisplayEvent } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
 import { getCurrentTenant } from '@/lib/tenant';
-import { getOutages, getRecentEvents, noteOfflineIfSilent } from '@/lib/fleet';
+import { getLoadStats, getOutages, getRecentEvents, noteOfflineIfSilent } from '@/lib/fleet';
 import {
   agentStatus,
   historyStrip,
@@ -43,6 +43,8 @@ export interface DisplayStatusPayload {
   uptime: { day: number | null; week: number | null; month: number | null };
   strip: Bucket[];
   events: DisplayEvent[];
+  /** Fresh page loads in the last 24h, and who did the last one. */
+  loads: { day: number; lastAt: string | null; lastUserAgent: string | null };
 }
 
 /**
@@ -107,6 +109,7 @@ export async function GET() {
     rows.map(async (d) => ({
       outages: await getOutages(d.id, 30 * DAY_MS, now),
       events: await getRecentEvents(d.id, 12),
+      loads: await getLoadStats(d.id, DAY_MS, now),
     })),
   );
 
@@ -158,7 +161,7 @@ export async function GET() {
       ? { ...slide, content: effectiveContent }
       : slide;
 
-    const { outages, events } = history[i];
+    const { outages, events, loads } = history[i];
     const since = d.createdAt ? new Date(d.createdAt) : null;
     const iso = (v: Date | string | null | undefined) => (v ? new Date(v).toISOString() : null);
 
@@ -193,6 +196,7 @@ export async function GET() {
         month: uptimePercent(outages, 30 * DAY_MS, { now, since }),
       },
       strip: historyStrip(outages, STRIP_WINDOW_MS, STRIP_BUCKETS, { now, since }),
+      loads: { day: loads.count, lastAt: loads.lastAt?.toISOString() ?? null, lastUserAgent: loads.lastUserAgent },
       events,
     };
   });

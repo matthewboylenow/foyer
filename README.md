@@ -202,3 +202,19 @@ The moat. Each new template is 2-3 days of work and a piece of marketing content
 - Video upload pipeline (transcoding to two H.264 variants, audio stripped, capped at 15 seconds).
 - Audit log UI for "who turned off the sanctuary candle slide last Sunday."
 - Slack notification on slide publish (optional integration).
+
+## Media: bundled vs uploaded
+
+Backgrounds, the logo and the video loop ship with the app in
+`public/media/` and are served by Vercel's CDN as ordinary (included)
+data transfer. Their `media.blob_url` is a path like
+`/media/advent-glow-joy-candle.jpg`. Files uploaded through the admin go
+to Vercel Blob as before and are billed as Blob transfer when served, so
+keep Blob for one-off posters and put anything permanent in `public/media`
+(then point its media row at the new path). To replace a bundled file,
+give it a new name: players cache `/media/*` for a day.
+
+The Displays page shows how many times each screen's page was loaded in
+the last 24 hours. A kiosk that reloads on its own schedule re-downloads
+every background each time; that number is the first thing to check when
+transfer looks high.

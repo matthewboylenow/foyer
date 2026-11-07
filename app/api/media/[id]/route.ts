@@ -1,5 +1,6 @@
 import { eq, and } from 'drizzle-orm';
 import { del } from '@vercel/blob';
+import { isBundledMediaUrl } from '@/lib/media-url';
 import { db } from '@/lib/db/client';
 import { media } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
@@ -44,7 +45,8 @@ export async function DELETE(
   // 404), proceed with the DB row removal so the library doesn't show
   // ghosts. Real errors (auth, network) still throw.
   try {
-    await del(m.blobUrl);
+    // Files bundled with the app (/media/...) have nothing in Blob to delete.
+    if (!isBundledMediaUrl(m.blobUrl)) await del(m.blobUrl);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (!msg.toLowerCase().includes('not found')) throw err;

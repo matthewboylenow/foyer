@@ -608,6 +608,15 @@ function DisplayCard({
             <Fact label="Player">
               <span className="text-navy">{dot.label}</span>
               <span className="text-xs text-navy/50 block">heartbeat {ago(status?.lastHeartbeatAt ?? null, now)}</span>
+              {status?.loads && (
+                <span
+                  className={`text-xs block ${status.loads.day > 24 ? 'text-rust' : 'text-navy/50'}`}
+                  title={status.loads.lastUserAgent ?? undefined}
+                >
+                  page loaded {status.loads.day}× in 24h
+                  {status.loads.lastAt ? `, last ${ago(status.loads.lastAt, now)}` : ''}
+                </span>
+              )}
             </Fact>
             <Fact label="Device">
               {isPi && info ? (

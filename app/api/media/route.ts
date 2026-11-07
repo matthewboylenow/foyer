@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth/config';
+import { isOwnMediaUrl } from '@/lib/media-url';
 import { db } from '@/lib/db/client';
 import { media } from '@/lib/db/schema';
 import { getCurrentTenant } from '@/lib/tenant';
@@ -48,8 +49,8 @@ export async function POST(req: Request) {
   if (!body.blobUrl || !body.filename || !body.type) {
     return Response.json({ error: 'Missing fields' }, { status: 400 });
   }
-  if (!body.blobUrl.includes('.public.blob.vercel-storage.com')) {
-    return Response.json({ error: 'Bad blob URL' }, { status: 400 });
+  if (!isOwnMediaUrl(body.blobUrl)) {
+    return Response.json({ error: 'Bad media URL' }, { status: 400 });
   }
   if (body.type !== 'image' && body.type !== 'logo' && body.type !== 'video') {
     return Response.json({ error: 'Bad type' }, { status: 400 });

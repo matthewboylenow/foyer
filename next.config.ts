@@ -19,6 +19,14 @@ const config: NextConfig = {
       headers: [{ key: 'Cache-Control', value: 'no-store' }],
     },
     {
+      // Backgrounds, logo and video loops ship with the app (public/media)
+      // and are served from Vercel's CDN, not Blob. Let players keep them
+      // for a day without revalidating; a redeploy with a changed file
+      // should also change the filename.
+      source: '/media/:path*',
+      headers: [{ key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' }],
+    },
+    {
       source: '/fonts/:path*',
       headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
     },

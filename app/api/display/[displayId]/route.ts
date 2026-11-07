@@ -1,5 +1,5 @@
 import { getEligibleSlides, getDisplayById } from '@/lib/db/queries';
-import { computePlaylistVersion } from '@/lib/fleet';
+import { computePlaylistVersion, recordPageLoad } from '@/lib/fleet';
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
@@ -34,6 +34,11 @@ export async function GET(
       getEligibleSlides(displayId),
     ]);
     const orientation = display?.orientation === 'landscape' ? 'landscape' : 'portrait';
+    // No If-None-Match means the page just started (the player always sends
+    // one once it knows a version). Count it; see recordPageLoad.
+    if (!ifNoneMatch && display) {
+      void recordPageLoad(display, req.headers.get('user-agent')).catch(() => {});
+    }
     return Response.json(
       { orientation, slides, version },
       { headers: etag ? { ...NO_STORE, ETag: etag } : NO_STORE },
