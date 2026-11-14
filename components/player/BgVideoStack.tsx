@@ -5,6 +5,8 @@ import { useEffect, useRef } from 'react';
 interface BgVideoStackProps {
   urls: string[];
   activeUrl: string | null;
+  /** How the active video sits in the frame; from the slide's content. */
+  fit?: 'cover' | 'contain';
 }
 
 /**
@@ -15,17 +17,17 @@ interface BgVideoStackProps {
  * <video> on every slide rotation, which forced fresh Range requests to Blob
  * each cycle and dominated transfer usage.
  */
-export function BgVideoStack({ urls, activeUrl }: BgVideoStackProps) {
+export function BgVideoStack({ urls, activeUrl, fit = 'cover' }: BgVideoStackProps) {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
       {urls.map((url) => (
-        <BgVideoEl key={url} url={url} active={url === activeUrl} />
+        <BgVideoEl key={url} url={url} active={url === activeUrl} fit={fit} />
       ))}
     </div>
   );
 }
 
-function BgVideoEl({ url, active }: { url: string; active: boolean }) {
+function BgVideoEl({ url, active, fit }: { url: string; active: boolean; fit: 'cover' | 'contain' }) {
   const ref = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -54,7 +56,7 @@ function BgVideoEl({ url, active }: { url: string; active: boolean }) {
         inset: 0,
         width: '100%',
         height: '100%',
-        objectFit: 'cover',
+        objectFit: fit,
         opacity: active ? 1 : 0,
         transition: 'opacity 600ms ease-out',
       }}

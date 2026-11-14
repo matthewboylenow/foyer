@@ -384,7 +384,12 @@ export type ParishIdentityContent = {
   bgImageMediaId?: string;
   /** Optional looping muted background video. Takes precedence over bgImage if both set. */
   bgVideoMediaId?: string;
+  /** 'cover' (default) fills the screen and crops; 'contain' shows the whole
+   *  video letterboxed, for a landscape loop on a portrait screen. */
+  bgVideoFit?: 'cover' | 'contain';
 };
+
+export type BgVideoFit = NonNullable<ParishIdentityContent['bgVideoFit']>;
 
 export type TextMode = 'light' | 'dark';
 

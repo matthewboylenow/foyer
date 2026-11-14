@@ -951,6 +951,28 @@ function TemplateFields({
                 onBgVideoChange(null);
               }}
             />
+            {bgVideoUrl && (
+              <div className="space-y-1">
+                <Label className="text-xs">Video fit</Label>
+                <div className="flex gap-4 text-sm">
+                  {([
+                    ['cover', 'Fill the screen (crops the edges)'],
+                    ['contain', 'Show the whole video (bands above and below)'],
+                  ] as const).map(([value, label]) => (
+                    <label key={value} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="bgVideoFit"
+                        checked={((content as { bgVideoFit?: string }).bgVideoFit ?? 'cover') === value}
+                        onChange={() => set('bgVideoFit', value)}
+                        className="accent-rust"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       );

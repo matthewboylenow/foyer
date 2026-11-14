@@ -56,6 +56,17 @@ vi.mock('@/lib/publish', () => ({
   getPublishStatus: async () => ({ publishedAt: null, publishedBy: null, reason: null, slideCount: 0, dirty: true, changes: [{ id: 'x', title: 'Fest', kind: 'added' }] }),
 }));
 
+vi.mock('@/lib/import/parse-email', () => ({
+  parseEmailText: async () => ({ items: [{ heading: 'Fest', subtitle: '', paragraphs: ['Come.'], cta: '', ctaUrl: '', eventDate: '', kind: 'announcement' }], usage: {}, model: 'x' }),
+}));
+vi.mock('@/lib/import/create-slides', () => ({
+  defaultImportCollectionName: () => 'Email blast · Test',
+  createEmailSlides: async (_t: string, opts: { items: unknown[]; publish?: boolean }, _a: unknown, action: string) => {
+    audit.push({ action });
+    return { collectionId: 'c', collectionName: 'Email blast · Test', created: opts.items.map((_, i) => ({ id: `s${i}`, title: 't' })), deactivated: 2, published: !!opts.publish };
+  },
+}));
+
 import { registerFoyerTools } from '../tools';
 
 type Handler = (args: Record<string, unknown>) => Promise<{ content: { text: string }[]; isError?: boolean }>;
@@ -76,7 +87,9 @@ const call = async (name: string, args: Record<string, unknown> = {}) => {
 
 describe('registerFoyerTools', () => {
   it('registers the six tools, each with a plain-English description', () => {
-    expect([...tools.keys()].sort()).toEqual(['get_screen_status', 'get_slide', 'list_slides', 'publish_screens', 'set_slide_active', 'upsert_slides']);
+    expect([...tools.keys()].sort()).toEqual([
+      'create_email_slides', 'get_screen_status', 'get_slide', 'list_slides', 'publish_screens', 'read_email', 'set_slide_active', 'upsert_slides',
+    ]);
     for (const [, t] of tools) expect(t.config.description.length).toBeGreaterThan(40);
     expect(tools.get('upsert_slides')!.config.description).toMatch(/endAt/);
     expect(tools.get('upsert_slides')!.config.description).toMatch(/headline/i);
@@ -121,6 +134,22 @@ describe('registerFoyerTools', () => {
     expect(data.displays[0]).toMatchObject({ name: 'Lobby', status: 'online' });
     expect(data.screens.upToDate).toBe(false);
     expect(data.templates.find((t: { templateType: string }) => t.templateType === 'general').fields.headline).toMatch(/50 characters/);
+  });
+
+  it('read_email strips HTML and returns the parsed sections', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test';
+    const { data } = await call('read_email', { source: '<html><body><h2>Fest</h2><p>' + 'Come to the fest on Saturday. '.repeat(5) + '</p></body></html>' });
+    expect(data.sections).toBe(1);
+    expect(data.items[0].heading).toBe('Fest');
+    expect(data.words).toBeGreaterThan(10);
+  });
+
+  it('create_email_slides defaults to deactivate + publish and audits as mcp:create_email_slides', async () => {
+    const { data } = await call('create_email_slides', { items: [{ heading: 'Fest', paragraphs: ['Come.'] }] });
+    expect(data.created).toHaveLength(1);
+    expect(data.deactivated).toBe(2);
+    expect(data.published).toBe(true);
+    expect(audit.at(-1)?.action).toBe('mcp:create_email_slides');
   });
 
   it('upsert_slides rejects an invalid payload at the schema', () => {

@@ -8,6 +8,9 @@ import { logAudit } from '@/lib/auth/session';
 import { getPublishStatus, publishPlaylist } from '@/lib/publish';
 import { agentStatus } from '@/lib/monitoring';
 import { IngestError, IngestRequestSchema, TEMPLATE_CATALOG, splitSourceKey, upsertSlides } from '@/lib/ingest';
+import { htmlToText } from '@/lib/import/html-to-text';
+import { parseEmailText } from '@/lib/import/parse-email';
+import { createEmailSlides, defaultImportCollectionName } from '@/lib/import/create-slides';
 
 /**
  * The tools a chat client gets. Every write goes through the same code as
@@ -301,6 +304,80 @@ export function registerFoyerTools(server: McpServer, ctx: ToolContext): void {
           endpoint: 'upsert_slides tool, or POST /api/ingest with Authorization: Bearer <token>',
           payload: '{ source, prune?, publish?, slides: [{ sourceId, title, templateType?, content: { headline, meta?, body?, cta?, ctaUrl?, eventDate? }, startAt?, endAt?, weight?, active? }] }',
         },
+      });
+    },
+  );
+
+  // ── The weekly email, the same two steps as Admin → Email import ──────────
+
+  server.registerTool(
+    'read_email',
+    {
+      title: 'Read the weekly email',
+      description:
+        'Step 1 of the weekly email import, identical to the Email import page. Paste the whole email (HubSpot "View source" HTML, or the plain text) and get back one proposed slide per section: heading, the date/time/place line, the paragraphs exactly as written, the call to action on its own line, the link, and the event date. Sections that look like a letter or boilerplate come back with kind "letter" or "other" so you can leave them out. Nothing is saved; review the list, then call create_email_slides with the items you want. Takes 30 to 90 seconds.',
+      inputSchema: z.object({
+        source: z.string().min(40).max(2_000_000).describe('The email as HTML source or plain text, unedited.'),
+      }),
+    },
+    async ({ source }) => {
+      if (!process.env.ANTHROPIC_API_KEY) return fail('ANTHROPIC_API_KEY is not set on the server.');
+      const text = htmlToText(source);
+      if (text.length < 40) return fail('Nothing readable in that paste.');
+      const today = new Date().toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York',
+      });
+      const result = await parseEmailText(text, today);
+      return json({
+        words: text.split(/\s+/).filter(Boolean).length,
+        sections: result.items.length,
+        items: result.items,
+        next: 'Review, then call create_email_slides with the items to keep (announcements are usually all of them; letters usually not).',
+      });
+    },
+  );
+
+  server.registerTool(
+    'create_email_slides',
+    {
+      title: 'Create this week\'s email slides',
+      description: [
+        'Step 2 of the weekly email import. Creates one General slide per item in a new collection named "Email blast · <today>", exactly as the Email import page does.',
+        'deactivatePrevious (default true) turns off the slides from earlier email blasts so the screens roll over to this week\'s set. Each item with an eventDate turns itself off the morning after the event unless expireAfterEvent is false.',
+        'publish (default true) puts the result on the TVs right away; with false it is staged until publish_screens.',
+      ].join(' '),
+      inputSchema: z.object({
+        items: z
+          .array(
+            z.object({
+              heading: z.string().trim().min(1).max(120).describe('Headline, as written in the email.'),
+              subtitle: z.string().trim().max(200).default('').describe('Date · time · place line.'),
+              paragraphs: z.array(z.string().max(2000)).max(20).default([]).describe('Body paragraphs, verbatim.'),
+              cta: z.string().trim().max(300).default('').describe('Call to action sentence, on its own line.'),
+              ctaUrl: z.string().trim().max(500).default('').describe('Link for the QR code (https).'),
+              eventDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).default('').describe('YYYY-MM-DD, or empty.'),
+              expireAfterEvent: z.boolean().default(true).describe('Turn the slide off the morning after eventDate.'),
+            }),
+          )
+          .min(1)
+          .max(40),
+        collectionName: z.string().trim().max(80).optional().describe('Defaults to "Email blast · <today>".'),
+        deactivatePrevious: z.boolean().default(true),
+        publish: z.boolean().default(true),
+      }),
+    },
+    async ({ items, collectionName, deactivatePrevious, publish }) => {
+      const result = await createEmailSlides(
+        tenantId,
+        { items, collectionName: collectionName ?? defaultImportCollectionName(), deactivatePrevious, publish },
+        { label: ctx.actor },
+        'mcp:create_email_slides',
+      );
+      return json({
+        ...result,
+        note: result.published
+          ? 'Published. The TVs switch within a minute.'
+          : 'Staged only. Call publish_screens to put these on the TVs.',
       });
     },
   );

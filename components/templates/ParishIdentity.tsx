@@ -79,7 +79,8 @@ export function ParishIdentity({ content, orientation = 'portrait', logoUrl, bgI
             loop
             playsInline
             preload="auto"
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full"
+            style={{ objectFit: content.bgVideoFit ?? 'cover' }}
           />
         )
       ) : bgImageUrl ? (

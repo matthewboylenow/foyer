@@ -20,7 +20,8 @@ import { tokenMatches } from '@/lib/mcp/token';
  * See README-mcp.md for connecting a client and rotating the token.
  */
 
-export const maxDuration = 60;
+// read_email waits on Claude for up to ~90s.
+export const maxDuration = 120;
 export const dynamic = 'force-dynamic';
 
 type Ctx = { params: Promise<{ token: string }> };

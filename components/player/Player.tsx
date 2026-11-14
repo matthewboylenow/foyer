@@ -421,10 +421,12 @@ export function Player({ displayId }: PlayerProps) {
   const SlideComponent = templateConfig.component as React.ComponentType<any>;
   const resolved = current.resolvedMedia ?? {};
   const currentVideoUrl = resolved.bgVideoUrl ?? null;
+  const currentVideoFit =
+    (current.content as { bgVideoFit?: 'cover' | 'contain' } | null)?.bgVideoFit ?? 'cover';
 
   return (
     <div className="relative w-full h-full bg-navy-900">
-      <BgVideoStack urls={poolVideoUrls} activeUrl={currentVideoUrl} />
+      <BgVideoStack urls={poolVideoUrls} activeUrl={currentVideoUrl} fit={currentVideoFit} />
       <SlideFrame
         slideId={`${current.id}-${currentIndex}`}
         holdMs={holdMs}
