@@ -31,6 +31,8 @@ at its own domain.
 | `publish_screens()` | Push the current "on" set to the TVs (same as the admin button). |
 | `read_email({ source })` | Step 1 of the weekly email import: paste the HubSpot source or plain text, get one proposed slide per section (copy verbatim). Same parser as Admin → Email import. |
 | `create_email_slides({ items[], deactivatePrevious?, publish? })` | Step 2: create the reviewed slides in an "Email blast · <date>" collection, turn off last week's, publish. |
+| `read_bulletin({ url?, text? })` | Mass intentions, Mass association and Sanctuary candle from the weekly bulletin PDF (newest on sainthelen.org by default). Deterministic parse, no model call. |
+| `update_parish_slides({ fromBulletin?, weekendLabel?, weekendRows?, weekdayRows?, associationNames?, candle?, publish? })` | Save those onto the three parish slides, like the "This week" page. `fromBulletin: true` reads and applies in one step. |
 | `get_screen_status()` | Counts, staged-but-unpublished changes, each TV online/offline, last ingest/MCP activity, and the templates with their fields. |
 
 Everything written is **staged** until published, exactly like edits in the

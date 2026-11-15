@@ -66,6 +66,51 @@ export function WeeklyParishForm({ slides, media }: { slides: WeeklySlides; medi
   const [candleName, setCandleName] = useState(initialCandle.name ?? '');
   const [inMemoryOf, setInMemoryOf] = useState(initialCandle.inMemoryOf ?? true);
   const [saving, setSaving] = useState(false);
+  const [filling, setFilling] = useState(false);
+  // Bumped after a bulletin fill so the paste boxes remount with the new rows.
+  const [fillKey, setFillKey] = useState(0);
+  const [fillNote, setFillNote] = useState<string | null>(null);
+
+  async function fillFromBulletin(file?: File) {
+    setFilling(true);
+    setFillNote(null);
+    try {
+      let res: Response;
+      if (file) {
+        const form = new FormData();
+        form.append('pdf', file);
+        res = await fetch('/api/import/bulletin', { method: 'POST', body: form });
+      } else {
+        res = await fetch('/api/import/bulletin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      }
+      const data = (await res.json()) as {
+        error?: string; found?: boolean; sourceUrl?: string | null; bulletinDate?: string | null;
+        weekendLabel?: string | null; weekendRows?: MassScheduleRow[]; weekdayRows?: MassScheduleRow[];
+        associationNames?: string[]; candle?: { name: string; inMemoryOf: boolean } | null; warnings?: string[];
+      };
+      if (!res.ok || !data.found) throw new Error(data.error ?? data.warnings?.[0] ?? 'Could not read the bulletin');
+      if (data.weekendLabel) setWeekendLabel(data.weekendLabel);
+      if (data.weekendRows?.length) setWeekendRows(data.weekendRows);
+      if (data.weekdayRows?.length) setWeekdayRows(data.weekdayRows);
+      if (data.associationNames?.length) setNames(data.associationNames);
+      if (data.candle) {
+        setCandleName(data.candle.name);
+        setInMemoryOf(data.candle.inMemoryOf);
+      }
+      setFillKey((k) => k + 1);
+      const when = data.bulletinDate
+        ? `the bulletin dated ${new Date(`${data.bulletinDate}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`
+        : file
+          ? file.name
+          : 'the latest bulletin';
+      setFillNote(`Filled from ${when}. Check the previews, then Save & publish.${data.warnings?.length ? ` ${data.warnings.join(' ')}` : ''}`);
+      toast.success(`Filled from ${when}`, { description: 'Nothing is saved yet.' });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not read the bulletin');
+    } finally {
+      setFilling(false);
+    }
+  }
 
   const massPreview: MassScheduleContent = { ...initialMass, weekendLabel, weekendRows, weekdayRows };
   const assocPreview: WeeklyAssociationContent = { ...initialAssoc, names };
@@ -121,6 +166,28 @@ export function WeeklyParishForm({ slides, media }: { slides: WeeklySlides; medi
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button onClick={() => fillFromBulletin()} disabled={filling || saving} variant="outline">
+          {filling ? 'Reading the bulletin…' : 'Fill from this week\'s bulletin'}
+        </Button>
+        <label className="text-sm text-rust underline underline-offset-2 cursor-pointer">
+          or upload the PDF
+          <input
+            type="file"
+            accept="application/pdf"
+            className="sr-only"
+            disabled={filling || saving}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (f) void fillFromBulletin(f);
+            }}
+          />
+        </label>
+        <span className="text-sm text-navy/60">
+          {fillNote ?? 'Reads the Mass intentions, Mass association and Sanctuary candle from the newest bulletin on sainthelen.org.'}
+        </span>
+      </div>
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {/* Mass Intentions */}
         <section className="rounded-xl border border-navy/15 bg-cream p-5 space-y-4">
@@ -146,6 +213,7 @@ export function WeeklyParishForm({ slides, media }: { slides: WeeklySlides; medi
           <div className="space-y-1">
             <p className="text-xs uppercase tracking-widest text-navy/50">Weekend Masses</p>
             <PasteParser
+              key={`we-${fillKey}`}
               templateType="mass_schedule_weekend"
               savedRows={weekendRows.map((r) => ({ ...r, needsReview: false }))}
               onParsed={(rows) => setWeekendRows(rows.map(({ needsReview: _n, ...r }) => r) as MassScheduleRow[])}
@@ -154,6 +222,7 @@ export function WeeklyParishForm({ slides, media }: { slides: WeeklySlides; medi
           <div className="space-y-1">
             <p className="text-xs uppercase tracking-widest text-navy/50">Daily Mass intentions</p>
             <PasteParser
+              key={`wd-${fillKey}`}
               templateType="mass_schedule_weekday"
               savedRows={weekdayRows.map((r) => ({ ...r, needsReview: false }))}
               onParsed={(rows) => setWeekdayRows(rows.map(({ needsReview: _n, ...r }) => r) as MassScheduleRow[])}
@@ -171,6 +240,7 @@ export function WeeklyParishForm({ slides, media }: { slides: WeeklySlides; medi
             <LivePreview templateType="weekly_association" content={assocPreview} orientation="portrait" width={150} bgImageUrl={media.association ?? null} />
           </div>
           <PasteParser
+            key={`wa-${fillKey}`}
             templateType="weekly_association"
             savedRows={names.map((name) => ({ name, needsReview: false }))}
             onParsed={(rows) => setNames((rows as { name: string }[]).map((r) => r.name))}

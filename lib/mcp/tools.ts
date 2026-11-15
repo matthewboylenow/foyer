@@ -11,6 +11,7 @@ import { IngestError, IngestRequestSchema, TEMPLATE_CATALOG, splitSourceKey, ups
 import { htmlToText } from '@/lib/import/html-to-text';
 import { parseEmailText } from '@/lib/import/parse-email';
 import { createEmailSlides, defaultImportCollectionName } from '@/lib/import/create-slides';
+import { applyParishUpdate, readBulletin } from '@/lib/import/bulletin';
 
 /**
  * The tools a chat client gets. Every write goes through the same code as
@@ -378,6 +379,90 @@ export function registerFoyerTools(server: McpServer, ctx: ToolContext): void {
         note: result.published
           ? 'Published. The TVs switch within a minute.'
           : 'Staged only. Call publish_screens to put these on the TVs.',
+      });
+    },
+  );
+
+  // ── The weekly bulletin → Mass intentions, Mass association, Sanctuary candle ──
+
+  const massRow = z.object({
+    timeLabel: z.string().trim().min(1).max(40).describe('"5:00PM" for weekend rows, "Nov 16" for daily rows.'),
+    intention: z.string().trim().min(1).max(200).describe('The intention as printed, e.g. "Margaret Mindnich" or "People of the Parish".'),
+  });
+
+  server.registerTool(
+    'read_bulletin',
+    {
+      title: 'Read the weekly bulletin',
+      description:
+        'Pulls the three parish items out of the weekly bulletin PDF: the Mass intentions (weekend label, weekend rows, daily rows), the Weekly Mass Association names, and the Sanctuary candle name. With no arguments it finds the newest bulletin on the parish website; or give a PDF url, or the already-extracted text of the page. Nothing is saved: review the result, then call update_parish_slides (or pass fromBulletin: true there to do both in one step).',
+      inputSchema: z.object({
+        url: z.string().url().optional().describe('A bulletin PDF (https). Omit to use the newest one on the parish site.'),
+        text: z.string().max(200_000).optional().describe('Text of the bulletin page, if you already have it (e.g. copied from the PDF).'),
+      }),
+    },
+    async ({ url, text }) => {
+      const r = await readBulletin({ url, text });
+      if (!r.found) return fail(r.warnings.join(' ') || 'Could not find the Mass intentions column.');
+      return json({ ...r, next: 'Call update_parish_slides with these values (or fromBulletin: true) to put them on the three parish slides.' });
+    },
+  );
+
+  server.registerTool(
+    'update_parish_slides',
+    {
+      title: 'Update the three parish slides',
+      description: [
+        'Writes the Mass intentions, Weekly Mass Association and Sanctuary candle slides, exactly like Save on the "This week" page. Give only the parts you want to change; the others are left alone.',
+        'fromBulletin: true reads the newest bulletin first (see read_bulletin) and uses its values; any field you also pass wins over the bulletin.',
+        'weekendLabel is the heading over the weekend Masses ("Weekend of November 14 / 15"). weekendRows are the Saturday/Sunday Masses with timeLabel "5:00PM" style; weekdayRows the daily Masses with timeLabel "Nov 16" style. associationNames is the full list for the week. candle has the name and whether it is in memory of (true) or in honor of (false).',
+        PUBLISH_NOTE,
+      ].join(' '),
+      inputSchema: z.object({
+        fromBulletin: z.boolean().default(false).describe('Read the newest bulletin and apply it.'),
+        bulletinUrl: z.string().url().optional().describe('A specific bulletin PDF to read instead of the newest.'),
+        weekendLabel: z.string().trim().max(80).optional(),
+        weekendRows: z.array(massRow).max(12).optional(),
+        weekdayRows: z.array(massRow).max(14).optional(),
+        associationNames: z.array(z.string().trim().min(1).max(80)).max(30).optional(),
+        candle: z.object({ name: z.string().trim().min(1).max(80), inMemoryOf: z.boolean().default(true) }).optional(),
+        publish: z.boolean().default(false).describe('Also publish to the TVs right away.'),
+      }),
+    },
+    async ({ fromBulletin, bulletinUrl, weekendLabel, weekendRows, weekdayRows, associationNames, candle, publish }) => {
+      let source: string | null = null;
+      let warnings: string[] = [];
+      const update: Parameters<typeof applyParishUpdate>[1] = {};
+      if (fromBulletin || bulletinUrl) {
+        const r = await readBulletin({ url: bulletinUrl });
+        if (!r.found) return fail(r.warnings.join(' ') || 'Could not find the Mass intentions column in the bulletin.');
+        source = r.sourceUrl;
+        warnings = r.warnings;
+        if (r.weekendLabel) update.weekendLabel = r.weekendLabel;
+        if (r.weekendRows.length) update.weekendRows = r.weekendRows;
+        if (r.weekdayRows.length) update.weekdayRows = r.weekdayRows;
+        if (r.associationNames.length) update.associationNames = r.associationNames;
+        if (r.candle) update.candle = r.candle;
+      }
+      if (weekendLabel !== undefined) update.weekendLabel = weekendLabel;
+      if (weekendRows) update.weekendRows = weekendRows;
+      if (weekdayRows) update.weekdayRows = weekdayRows;
+      if (associationNames) update.associationNames = associationNames;
+      if (candle) update.candle = { name: candle.name, inMemoryOf: candle.inMemoryOf };
+      if (Object.keys(update).length === 0) return fail('Nothing to update: pass fields, or fromBulletin: true.');
+
+      const result = await applyParishUpdate(tenantId, update, ctx.actor, {
+        publish,
+        auditAction: 'mcp:update_parish_slides',
+        reason: 'mcp',
+        source,
+      });
+      return json({
+        ...result,
+        applied: update,
+        source,
+        warnings,
+        note: result.published ? 'Published. The TVs switch within a minute.' : 'Staged only. Call publish_screens to put this on the TVs.',
       });
     },
   );

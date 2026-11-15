@@ -67,6 +67,21 @@ vi.mock('@/lib/import/create-slides', () => ({
   },
 }));
 
+const parishApplied: unknown[] = [];
+vi.mock('@/lib/import/bulletin', () => ({
+  readBulletin: async () => ({
+    found: true, sourceUrl: 'https://sainthelen.org/b.pdf', bulletinDate: '2026-11-15', pages: 2,
+    weekendLabel: 'Weekend of November 14 / 15',
+    weekendRows: [{ timeLabel: '5:00PM', intention: 'A' }], weekdayRows: [{ timeLabel: 'Nov 16', intention: 'B' }],
+    associationNames: ['C', 'D'], candle: { name: 'E', inMemoryOf: true }, warnings: [],
+  }),
+  applyParishUpdate: async (_t: string, update: unknown, _a: string, opts: { auditAction: string; publish?: boolean }) => {
+    parishApplied.push(update);
+    audit.push({ action: opts.auditAction });
+    return { updated: [{ slide: 'intentions', id: 'i', created: false }], skipped: [], published: !!opts.publish };
+  },
+}));
+
 import { registerFoyerTools } from '../tools';
 
 type Handler = (args: Record<string, unknown>) => Promise<{ content: { text: string }[]; isError?: boolean }>;
@@ -88,7 +103,8 @@ const call = async (name: string, args: Record<string, unknown> = {}) => {
 describe('registerFoyerTools', () => {
   it('registers the six tools, each with a plain-English description', () => {
     expect([...tools.keys()].sort()).toEqual([
-      'create_email_slides', 'get_screen_status', 'get_slide', 'list_slides', 'publish_screens', 'read_email', 'set_slide_active', 'upsert_slides',
+      'create_email_slides', 'get_screen_status', 'get_slide', 'list_slides', 'publish_screens', 'read_bulletin', 'read_email',
+      'set_slide_active', 'update_parish_slides', 'upsert_slides',
     ]);
     for (const [, t] of tools) expect(t.config.description.length).toBeGreaterThan(40);
     expect(tools.get('upsert_slides')!.config.description).toMatch(/endAt/);
@@ -150,6 +166,23 @@ describe('registerFoyerTools', () => {
     expect(data.deactivated).toBe(2);
     expect(data.published).toBe(true);
     expect(audit.at(-1)?.action).toBe('mcp:create_email_slides');
+  });
+
+  it('read_bulletin returns the parsed parish section', async () => {
+    const { data } = await call('read_bulletin');
+    expect(data.weekendLabel).toBe('Weekend of November 14 / 15');
+    expect(data.candle.name).toBe('E');
+  });
+
+  it('update_parish_slides from the bulletin applies every part, explicit fields win, audits as mcp:update_parish_slides', async () => {
+    const { data } = await call('update_parish_slides', { fromBulletin: true, candle: { name: 'Override' } });
+    expect(data.applied.weekendRows).toHaveLength(1);
+    expect(data.applied.associationNames).toEqual(['C', 'D']);
+    expect(data.applied.candle).toEqual({ name: 'Override', inMemoryOf: true });
+    expect(data.published).toBe(false);
+    expect(audit.at(-1)?.action).toBe('mcp:update_parish_slides');
+    const none = await call('update_parish_slides', {});
+    expect(none.res.isError).toBe(true);
   });
 
   it('upsert_slides rejects an invalid payload at the schema', () => {
