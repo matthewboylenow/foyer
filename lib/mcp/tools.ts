@@ -10,8 +10,9 @@ import { agentStatus } from '@/lib/monitoring';
 import { IngestError, IngestRequestSchema, TEMPLATE_CATALOG, splitSourceKey, upsertSlides } from '@/lib/ingest';
 import { htmlToText } from '@/lib/import/html-to-text';
 import { parseEmailText } from '@/lib/import/parse-email';
-import { createEmailSlides, defaultImportCollectionName } from '@/lib/import/create-slides';
-import { applyParishUpdate, readBulletin } from '@/lib/import/bulletin';
+import { BULLETIN_COLLECTION_PREFIX, createEmailSlides, defaultImportCollectionName } from '@/lib/import/create-slides';
+import { applyParishUpdate, loadBulletinText, parishSectionFromPages, readBulletin } from '@/lib/import/bulletin';
+import { findDuplicates, loadActiveAnnouncements, retirePastAnnouncements, slideToExisting } from '@/lib/import/announcements';
 
 /**
  * The tools a chat client gets. Every write goes through the same code as
@@ -338,6 +339,28 @@ export function registerFoyerTools(server: McpServer, ctx: ToolContext): void {
     },
   );
 
+  const announcementItem = z.object({
+    heading: z.string().trim().min(1).max(120).describe('Headline, as written.'),
+    subtitle: z.string().trim().max(200).default('').describe('Date · time · place line.'),
+    paragraphs: z.array(z.string().max(2000)).max(20).default([]).describe('Body paragraphs, verbatim.'),
+    cta: z.string().trim().max(300).default('').describe('Call to action sentence, on its own line.'),
+    ctaUrl: z.string().trim().max(500).default('').describe('Link for the QR code (https).'),
+    eventDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).default('').describe('YYYY-MM-DD, or empty.'),
+    expireAfterEvent: z.boolean().default(true).describe('Turn the slide off the morning after eventDate.'),
+  });
+
+  const todayLabel = () =>
+    new Date().toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York',
+    });
+
+  /** Mark proposed announcements that are already on the screens. */
+  async function annotateDuplicates<T extends { heading: string; eventDate?: string }>(items: T[]) {
+    const existing = (await loadActiveAnnouncements(tenantId)).map(slideToExisting);
+    const dupes = findDuplicates(items, existing);
+    return items.map((it, i) => ({ ...it, alreadyOnScreens: dupes.get(i) ? { id: dupes.get(i)!.id, title: dupes.get(i)!.title } : null }));
+  }
+
   server.registerTool(
     'create_email_slides',
     {
@@ -348,20 +371,7 @@ export function registerFoyerTools(server: McpServer, ctx: ToolContext): void {
         'publish (default true) puts the result on the TVs right away; with false it is staged until publish_screens.',
       ].join(' '),
       inputSchema: z.object({
-        items: z
-          .array(
-            z.object({
-              heading: z.string().trim().min(1).max(120).describe('Headline, as written in the email.'),
-              subtitle: z.string().trim().max(200).default('').describe('Date · time · place line.'),
-              paragraphs: z.array(z.string().max(2000)).max(20).default([]).describe('Body paragraphs, verbatim.'),
-              cta: z.string().trim().max(300).default('').describe('Call to action sentence, on its own line.'),
-              ctaUrl: z.string().trim().max(500).default('').describe('Link for the QR code (https).'),
-              eventDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).default('').describe('YYYY-MM-DD, or empty.'),
-              expireAfterEvent: z.boolean().default(true).describe('Turn the slide off the morning after eventDate.'),
-            }),
-          )
-          .min(1)
-          .max(40),
+        items: z.array(announcementItem).min(1).max(40),
         collectionName: z.string().trim().max(80).optional().describe('Defaults to "Email blast · <today>".'),
         deactivatePrevious: z.boolean().default(true),
         publish: z.boolean().default(true),
@@ -399,12 +409,29 @@ export function registerFoyerTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: z.object({
         url: z.string().url().optional().describe('A bulletin PDF (https). Omit to use the newest one on the parish site.'),
         text: z.string().max(200_000).optional().describe('Text of the bulletin page, if you already have it (e.g. copied from the PDF).'),
+        includeAnnouncements: z
+          .boolean()
+          .default(false)
+          .describe('Also split the rest of the bulletin into proposed announcement slides (uses Claude, 30 to 90 seconds). Each comes back with alreadyOnScreens when a matching slide is on.'),
       }),
     },
-    async ({ url, text }) => {
-      const r = await readBulletin({ url, text });
-      if (!r.found) return fail(r.warnings.join(' ') || 'Could not find the Mass intentions column.');
-      return json({ ...r, next: 'Call update_parish_slides with these values (or fromBulletin: true) to put them on the three parish slides.' });
+    async ({ url, text, includeAnnouncements }) => {
+      const t = await loadBulletinText({ url, text });
+      const parish = parishSectionFromPages(t.pages);
+      if (!parish.found) return fail(parish.warnings.join(' ') || 'Could not find the Mass intentions column.');
+      let announcements: unknown = undefined;
+      if (includeAnnouncements) {
+        if (!process.env.ANTHROPIC_API_KEY) return fail('ANTHROPIC_API_KEY is not set on the server, so announcements cannot be read.');
+        const parsed = await parseEmailText(t.pages.join('\n\n'), todayLabel(), 'bulletin');
+        announcements = await annotateDuplicates(parsed.items);
+      }
+      return json({
+        ...parish,
+        sourceUrl: t.sourceUrl,
+        bulletinDate: t.bulletinDate,
+        announcements,
+        next: 'update_parish_slides (or fromBulletin: true) puts the parish items on the three slides; create_bulletin_slides creates the announcements you choose.',
+      });
     },
   );
 
@@ -463,6 +490,143 @@ export function registerFoyerTools(server: McpServer, ctx: ToolContext): void {
         source,
         warnings,
         note: result.published ? 'Published. The TVs switch within a minute.' : 'Staged only. Call publish_screens to put this on the TVs.',
+      });
+    },
+  );
+
+  server.registerTool(
+    'create_bulletin_slides',
+    {
+      title: 'Create announcement slides from the bulletin',
+      description: [
+        'Creates one General slide per item in a "Bulletin · <today>" collection, like create_email_slides does for the email. Items usually come from read_bulletin with includeAnnouncements: true.',
+        'skipDuplicates (default true) leaves out any item that matches an announcement already on the screens (for example one the email import created), and reports which. deactivatePrevious (default true) turns off slides from earlier bulletin collections.',
+        'Each item with an eventDate turns itself off the morning after the event unless expireAfterEvent is false. publish (default true) puts the result on the TVs right away.',
+      ].join(' '),
+      inputSchema: z.object({
+        items: z.array(announcementItem).min(1).max(40),
+        collectionName: z.string().trim().max(80).optional().describe('Defaults to "Bulletin · <today>".'),
+        deactivatePrevious: z.boolean().default(true),
+        skipDuplicates: z.boolean().default(true),
+        publish: z.boolean().default(true),
+      }),
+    },
+    async ({ items, collectionName, deactivatePrevious, skipDuplicates, publish }) => {
+      let toCreate = items;
+      let skipped: { heading: string; alreadyOnScreens: { id: string; title: string } }[] = [];
+      if (skipDuplicates) {
+        const annotated = await annotateDuplicates(items);
+        skipped = annotated
+          .filter((a) => a.alreadyOnScreens)
+          .map((a) => ({ heading: a.heading, alreadyOnScreens: a.alreadyOnScreens! }));
+        toCreate = annotated.filter((a) => !a.alreadyOnScreens).map(({ alreadyOnScreens: _d, ...it }) => it);
+      }
+      if (toCreate.length === 0) return json({ created: [], skipped, note: 'Every item is already on the screens; nothing created.' });
+      const result = await createEmailSlides(
+        tenantId,
+        { items: toCreate, collectionName: collectionName ?? defaultImportCollectionName(new Date(), BULLETIN_COLLECTION_PREFIX), collectionPrefix: BULLETIN_COLLECTION_PREFIX, deactivatePrevious, publish },
+        { label: ctx.actor },
+        'mcp:create_bulletin_slides',
+      );
+      return json({
+        ...result,
+        skipped,
+        note: result.published ? 'Published. The TVs switch within a minute.' : 'Staged only. Call publish_screens to put these on the TVs.',
+      });
+    },
+  );
+
+  server.registerTool(
+    'retire_past_slides',
+    {
+      title: 'Turn off announcements whose date has passed',
+      description:
+        'Finds announcement slides that are still on but whose end date has passed (or, with no end date, whose event date is before today) and turns them off. Nothing is deleted. Pinned slides, takeovers and the three parish slides are never touched. dryRun: true only lists them. The TVs already skip dated slides on their own, so this is housekeeping for the Slides page; publish is only needed if something else is staged.',
+      inputSchema: z.object({
+        dryRun: z.boolean().default(false).describe('List what would be turned off without changing anything.'),
+        publish: z.boolean().default(false),
+      }),
+    },
+    async ({ dryRun, publish }) => {
+      const r = await retirePastAnnouncements(tenantId, ctx.actor, { dryRun, publish, auditAction: 'mcp:retire_past_slides', reason: 'mcp' });
+      return json({ ...r, note: dryRun ? `${r.retired.length} would be turned off.` : `${r.retired.length} turned off.` });
+    },
+  );
+
+  server.registerTool(
+    'sync_bulletin',
+    {
+      title: 'Weekly bulletin sync',
+      description: [
+        'The whole weekly routine in one call, in this order: (1) read the newest bulletin (or the url/text given) and write the Mass intentions, Weekly Mass Association and Sanctuary candle onto the three parish slides; (2) turn off announcements whose dates have passed; (3) split the bulletin\'s announcements into proposed slides, marking any already on the screens.',
+        'Announcements are only proposed unless createAnnouncements: true, in which case the ones not already on the screens are created in a "Bulletin · <today>" collection. publish (default true) publishes once at the end if anything changed.',
+      ].join(' '),
+      inputSchema: z.object({
+        url: z.string().url().optional().describe('A specific bulletin PDF; omit for the newest on the parish site.'),
+        text: z.string().max(200_000).optional().describe('Bulletin text, if you already have it.'),
+        createAnnouncements: z.boolean().default(false).describe('Create the non-duplicate announcement slides instead of only proposing them.'),
+        retirePast: z.boolean().default(true),
+        publish: z.boolean().default(true),
+      }),
+    },
+    async ({ url, text, createAnnouncements, retirePast, publish }) => {
+      const t = await loadBulletinText({ url, text });
+      const parish = parishSectionFromPages(t.pages);
+      if (!parish.found) return fail(parish.warnings.join(' ') || 'Could not find the Mass intentions column in the bulletin.');
+
+      // 1. Parish slides.
+      const update: Parameters<typeof applyParishUpdate>[1] = {};
+      if (parish.weekendLabel) update.weekendLabel = parish.weekendLabel;
+      if (parish.weekendRows.length) update.weekendRows = parish.weekendRows;
+      if (parish.weekdayRows.length) update.weekdayRows = parish.weekdayRows;
+      if (parish.associationNames.length) update.associationNames = parish.associationNames;
+      if (parish.candle) update.candle = parish.candle;
+      const parishResult = await applyParishUpdate(tenantId, update, ctx.actor, { auditAction: 'mcp:sync_bulletin', source: t.sourceUrl });
+
+      // 2. Retire past announcements.
+      const retired = retirePast
+        ? await retirePastAnnouncements(tenantId, ctx.actor, { auditAction: 'mcp:retire_past_slides', reason: 'mcp' })
+        : { retired: [], dryRun: false, published: false };
+
+      // 3. Announcements.
+      let announcements: unknown = 'skipped: ANTHROPIC_API_KEY is not set on the server';
+      let created: unknown = null;
+      if (process.env.ANTHROPIC_API_KEY) {
+        const parsed = await parseEmailText(t.pages.join('\n\n'), todayLabel(), 'bulletin');
+        const annotated = await annotateDuplicates(parsed.items.filter((i) => i.kind === 'announcement'));
+        announcements = annotated;
+        if (createAnnouncements) {
+          const fresh = annotated.filter((a) => !a.alreadyOnScreens).map(({ alreadyOnScreens: _d, kind: _k, ...it }) => ({ ...it, expireAfterEvent: true }));
+          if (fresh.length > 0) {
+            created = await createEmailSlides(
+              tenantId,
+              { items: fresh, collectionPrefix: BULLETIN_COLLECTION_PREFIX, deactivatePrevious: true, publish: false },
+              { label: ctx.actor },
+              'mcp:create_bulletin_slides',
+            );
+          }
+        }
+      }
+
+      let published = false;
+      const changed = parishResult.updated.length > 0 || retired.retired.length > 0 || created !== null;
+      if (publish && changed) {
+        await publishPlaylist(tenantId, ctx.actor, 'mcp');
+        published = true;
+      }
+      return json({
+        source: t.sourceUrl,
+        bulletinDate: t.bulletinDate,
+        parish: { applied: update, warnings: parish.warnings, updated: parishResult.updated },
+        retired: retired.retired,
+        announcements,
+        created,
+        published,
+        note: published
+          ? 'Published. The TVs switch within a minute.'
+          : changed
+            ? 'Staged only. Call publish_screens to put this on the TVs.'
+            : 'Nothing changed.',
       });
     },
   );

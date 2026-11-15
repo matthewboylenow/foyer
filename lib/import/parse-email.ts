@@ -38,7 +38,10 @@ export const MODEL = 'claude-opus-5-5';
  *  next import can find and retire the previous week's slides. */
 export const IMPORT_COLLECTION_PREFIX = 'Email blast · ';
 
-function systemPrompt(today: string): string {
+export type ImportSource = 'email' | 'bulletin';
+
+function systemPrompt(today: string, source: ImportSource = 'email'): string {
+  if (source === 'bulletin') return bulletinPrompt(today);
   return `You split a Catholic parish's weekly email newsletter into screen slides, one per announcement. Today is ${today} (America/New_York).
 
 You are a copy-preserving segmenter, not a writer. The parish wants every slide to read exactly as the email was written.
@@ -56,22 +59,41 @@ Rules:
 Return every announcement in the order it appears.`;
 }
 
+function bulletinPrompt(today: string): string {
+  return `You split the text of a Catholic parish's weekly printed bulletin (extracted from its PDF) into screen slides, one per announcement. Today is ${today} (America/New_York).
+
+You are a copy-preserving segmenter, not a writer. The parish wants every slide to read exactly as the bulletin was written.
+
+Rules:
+1. One item per announcement that has its own heading and copy: events, programs, drives, registrations, concerts, talks, retreats. Skip: the masthead, staff directory and contact table, Mass and confession times, office hours, ways to give, social-media handles, page footers, the "Mark your calendar" digest list, the "We're so glad you're here" welcome box, and the Mass intentions / Weekly Mass Association / Sanctuary candle column (those are handled elsewhere).
+2. heading: the announcement's heading as a normal title. Bulletin headings are often letter-spaced ("B R E A K F A S T   W I T H   S A N T A") or in capitals; write them with normal spacing and capitalization ("Breakfast with Santa"). Do not add words.
+3. paragraphs: the body copy word for word, in order, one entry per paragraph. The PDF wraps lines mid-sentence and sometimes interleaves columns: join wrapped lines back into their sentences and keep each announcement's own lines together, but never shorten, summarize, rewrite, reorder, correct or add anything. Keep names, prices, times, links and phone numbers as written.
+4. cta: the sentence that tells the reader what to do next (register, sign up, RSVP, visit, email, call, contact), exactly as written and including its punctuation. Remove it from paragraphs so it stands on its own line. Empty string if none.
+5. ctaUrl: a URL written in or next to the call to action, with https:// added if it was written bare (e.g. "sainthelen.org/santa" → "https://sainthelen.org/santa"). Empty string if none. Never invent one.
+6. subtitle: the event's date and time, and place if given, assembled only from facts in the announcement: "Saturday, December 5 · Seatings 8:30am and 10:00am · Gym". Empty string if there is no date or time. Leave the date and time in the paragraphs as well.
+7. eventDate: the event's calendar date as YYYY-MM-DD, resolved relative to today when only a weekday and day-of-month are given. Empty string if unknown or not a dated event. For multi-date items use the first date.
+8. kind: 'letter' for the pastor's column and the Stewardship Spotlight; 'other' for digests, lists and boilerplate; 'announcement' for everything else.
+
+Return every announcement in the order it appears.`;
+}
+
 export interface ParseEmailResult {
   items: ImportItem[];
   usage: { inputTokens: number; outputTokens: number };
   model: string;
 }
 
-export async function parseEmailText(text: string, today: string): Promise<ParseEmailResult> {
+export async function parseEmailText(text: string, today: string, source: ImportSource = 'email'): Promise<ParseEmailResult> {
   const client = new Anthropic();
+  const label = source === 'bulletin' ? 'bulletin' : 'email';
   const response = await client.messages.parse({
     model: MODEL,
     max_tokens: 16000,
-    system: systemPrompt(today),
+    system: systemPrompt(today, source),
     messages: [
       {
         role: 'user',
-        content: `Here is this week's email, converted to text. Split it into slides.\n\n<email>\n${text}\n</email>`,
+        content: `Here is this week's ${label}, converted to text. Split it into slides.\n\n<${label}>\n${text}\n</${label}>`,
       },
     ],
     output_config: {

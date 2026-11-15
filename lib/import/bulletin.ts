@@ -283,22 +283,39 @@ export function parseParishSection(text: string): ParishSection {
  * Read the parish section from a bulletin: by URL, from the newest one on
  * the parish site when no URL is given, or from text already extracted.
  */
-export async function readBulletin(
-  input: { url?: string | null; text?: string | null; pdf?: Uint8Array | null } = {},
-): Promise<BulletinRead> {
-  if (input.text?.trim()) {
-    return { ...parseParishSection(input.text), sourceUrl: null, bulletinDate: null, pages: 0 };
-  }
+export interface BulletinInput {
+  url?: string | null;
+  text?: string | null;
+  pdf?: Uint8Array | null;
+}
+
+export interface BulletinText {
+  pages: string[];
+  sourceUrl: string | null;
+  bulletinDate: string | null;
+}
+
+/** The bulletin's text, page by page, from whichever input was given
+ *  (text, uploaded PDF, URL, or the newest PDF on the parish site). */
+export async function loadBulletinText(input: BulletinInput = {}): Promise<BulletinText> {
+  if (input.text?.trim()) return { pages: [input.text], sourceUrl: null, bulletinDate: null };
   if (input.pdf && input.pdf.byteLength > 0) {
-    const pages = await extractPdfText(input.pdf);
-    const page = pages.find((p) => parseParishSection(p).found) ?? pages.join('\n');
-    return { ...parseParishSection(page), sourceUrl: null, bulletinDate: null, pages: pages.length };
+    return { pages: await extractPdfText(input.pdf), sourceUrl: null, bulletinDate: null };
   }
   const url = input.url?.trim() || (await findLatestBulletinUrl());
   if (!url) throw new Error('No bulletin PDF found on the parish site.');
   const pages = await extractPdfText(await fetchBulletinPdf(url));
+  return { pages, sourceUrl: url, bulletinDate: bulletinDateFromUrl(url) };
+}
+
+export function parishSectionFromPages(pages: string[]): ParishSection {
   const page = pages.find((p) => parseParishSection(p).found) ?? pages.join('\n');
-  return { ...parseParishSection(page), sourceUrl: url, bulletinDate: bulletinDateFromUrl(url), pages: pages.length };
+  return parseParishSection(page);
+}
+
+export async function readBulletin(input: BulletinInput = {}): Promise<BulletinRead> {
+  const t = await loadBulletinText(input);
+  return { ...parishSectionFromPages(t.pages), sourceUrl: t.sourceUrl, bulletinDate: t.bulletinDate, pages: input.text ? 0 : t.pages.length };
 }
 
 // ─── Applying to the three slides ────────────────────────────────────────────

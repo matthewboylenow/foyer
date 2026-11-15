@@ -27,6 +27,9 @@ export interface CreateItem {
 export interface CreateOptions {
   items: CreateItem[];
   collectionName?: string;
+  /** "Email blast · " (default) or "Bulletin · ": names the new collection
+   *  and scopes deactivatePrevious to collections with the same prefix. */
+  collectionPrefix?: string;
   deactivatePrevious?: boolean;
   activate?: boolean;
   publish?: boolean;
@@ -49,8 +52,10 @@ function dayAfterMorning(ymd: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-export function defaultImportCollectionName(now = new Date()): string {
-  return `${IMPORT_COLLECTION_PREFIX}${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })}`;
+export const BULLETIN_COLLECTION_PREFIX = 'Bulletin · ';
+
+export function defaultImportCollectionName(now = new Date(), prefix = IMPORT_COLLECTION_PREFIX): string {
+  return `${prefix}${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })}`;
 }
 
 export async function createEmailSlides(
@@ -64,14 +69,15 @@ export async function createEmailSlides(
 
   const by = actor.email ?? actor.label;
   const now = new Date();
-  const collectionName = opts.collectionName?.trim() || defaultImportCollectionName(now);
+  const prefix = opts.collectionPrefix ?? IMPORT_COLLECTION_PREFIX;
+  const collectionName = opts.collectionName?.trim() || defaultImportCollectionName(now, prefix);
   const activate = opts.activate !== false;
 
   // 1. Retire the previous import(s).
   let deactivated = 0;
   if (opts.deactivatePrevious) {
     const previous = await db.query.collections.findMany({
-      where: and(eq(collections.tenantId, tenantId), like(collections.name, `${IMPORT_COLLECTION_PREFIX}%`)),
+      where: and(eq(collections.tenantId, tenantId), like(collections.name, `${prefix}%`)),
     });
     const ids = previous.map((c) => c.id);
     if (ids.length > 0) {

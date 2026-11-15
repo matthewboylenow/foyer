@@ -57,10 +57,33 @@ vi.mock('@/lib/publish', () => ({
 }));
 
 vi.mock('@/lib/import/parse-email', () => ({
-  parseEmailText: async () => ({ items: [{ heading: 'Fest', subtitle: '', paragraphs: ['Come.'], cta: '', ctaUrl: '', eventDate: '', kind: 'announcement' }], usage: {}, model: 'x' }),
+  parseEmailText: async (_t: string, _d: string, source?: string) => ({
+    items: source === 'bulletin'
+      ? [
+          { heading: 'Breakfast with Santa', subtitle: 'Saturday, December 5', paragraphs: ['Santa is coming.'], cta: '', ctaUrl: '', eventDate: '2026-12-05', kind: 'announcement' },
+          { heading: 'Christmas Concert', subtitle: 'Friday, December 4', paragraphs: ['Carols.'], cta: '', ctaUrl: '', eventDate: '2026-12-04', kind: 'announcement' },
+          { heading: 'From Our Pastor', subtitle: '', paragraphs: ['Dear friends.'], cta: '', ctaUrl: '', eventDate: '', kind: 'letter' },
+        ]
+      : [{ heading: 'Fest', subtitle: '', paragraphs: ['Come.'], cta: '', ctaUrl: '', eventDate: '', kind: 'announcement' }],
+    usage: {}, model: 'x',
+  }),
 }));
+const retireCalls: unknown[] = [];
+vi.mock('@/lib/import/announcements', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/import/announcements')>('@/lib/import/announcements');
+  return {
+    ...actual,
+    loadActiveAnnouncements: async () => [slideRow, { ...slideRow, id: '33333333-3333-4333-8333-333333333333', title: 'Breakfast With Santa', content: { templateType: 'general', headline: 'Breakfast With Santa', eventDate: '2026-12-05' } }],
+    retirePastAnnouncements: async (_t: string, _a: string, opts: { dryRun?: boolean; auditAction: string }) => {
+      retireCalls.push(opts);
+      audit.push({ action: opts.auditAction });
+      return { retired: [{ id: 'old', title: 'Old', endAt: null, eventDate: '2026-10-01' }], dryRun: !!opts.dryRun, published: false };
+    },
+  };
+});
 vi.mock('@/lib/import/create-slides', () => ({
-  defaultImportCollectionName: () => 'Email blast · Test',
+  BULLETIN_COLLECTION_PREFIX: 'Bulletin · ',
+  defaultImportCollectionName: (_d?: Date, prefix = 'Email blast · ') => `${prefix}Test`,
   createEmailSlides: async (_t: string, opts: { items: unknown[]; publish?: boolean }, _a: unknown, action: string) => {
     audit.push({ action });
     return { collectionId: 'c', collectionName: 'Email blast · Test', created: opts.items.map((_, i) => ({ id: `s${i}`, title: 't' })), deactivated: 2, published: !!opts.publish };
@@ -72,6 +95,12 @@ vi.mock('@/lib/import/bulletin', () => ({
   readBulletin: async () => ({
     found: true, sourceUrl: 'https://sainthelen.org/b.pdf', bulletinDate: '2026-11-15', pages: 2,
     weekendLabel: 'Weekend of November 14 / 15',
+    weekendRows: [{ timeLabel: '5:00PM', intention: 'A' }], weekdayRows: [{ timeLabel: 'Nov 16', intention: 'B' }],
+    associationNames: ['C', 'D'], candle: { name: 'E', inMemoryOf: true }, warnings: [],
+  }),
+  loadBulletinText: async () => ({ pages: ['M A S S I N T E N T I O N S…', 'announcements…'], sourceUrl: 'https://sainthelen.org/b.pdf', bulletinDate: '2026-11-15' }),
+  parishSectionFromPages: () => ({
+    found: true, weekendLabel: 'Weekend of November 14 / 15',
     weekendRows: [{ timeLabel: '5:00PM', intention: 'A' }], weekdayRows: [{ timeLabel: 'Nov 16', intention: 'B' }],
     associationNames: ['C', 'D'], candle: { name: 'E', inMemoryOf: true }, warnings: [],
   }),
@@ -103,8 +132,8 @@ const call = async (name: string, args: Record<string, unknown> = {}) => {
 describe('registerFoyerTools', () => {
   it('registers the six tools, each with a plain-English description', () => {
     expect([...tools.keys()].sort()).toEqual([
-      'create_email_slides', 'get_screen_status', 'get_slide', 'list_slides', 'publish_screens', 'read_bulletin', 'read_email',
-      'set_slide_active', 'update_parish_slides', 'upsert_slides',
+      'create_bulletin_slides', 'create_email_slides', 'get_screen_status', 'get_slide', 'list_slides', 'publish_screens',
+      'read_bulletin', 'read_email', 'retire_past_slides', 'set_slide_active', 'sync_bulletin', 'update_parish_slides', 'upsert_slides',
     ]);
     for (const [, t] of tools) expect(t.config.description.length).toBeGreaterThan(40);
     expect(tools.get('upsert_slides')!.config.description).toMatch(/endAt/);
@@ -183,6 +212,42 @@ describe('registerFoyerTools', () => {
     expect(audit.at(-1)?.action).toBe('mcp:update_parish_slides');
     const none = await call('update_parish_slides', {});
     expect(none.res.isError).toBe(true);
+  });
+
+  it('read_bulletin with announcements marks the ones already on the screens', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test';
+    const { data } = await call('read_bulletin', { includeAnnouncements: true });
+    expect(data.announcements).toHaveLength(3);
+    expect(data.announcements[0].alreadyOnScreens.title).toBe('Breakfast With Santa');
+    expect(data.announcements[1].alreadyOnScreens).toBeNull();
+  });
+
+  it('create_bulletin_slides skips duplicates and creates the rest in a Bulletin collection', async () => {
+    const { data } = await call('create_bulletin_slides', {
+      items: [{ heading: 'Breakfast with Santa', eventDate: '2026-12-05' }, { heading: 'Christmas Concert', eventDate: '2026-12-04' }],
+      publish: false,
+    });
+    expect(data.skipped).toHaveLength(1);
+    expect(data.created).toHaveLength(1);
+    expect(audit.at(-1)?.action).toBe('mcp:create_bulletin_slides');
+  });
+
+  it('retire_past_slides reports and audits', async () => {
+    const { data } = await call('retire_past_slides', { dryRun: true });
+    expect(data.retired[0].title).toBe('Old');
+    expect(data.dryRun).toBe(true);
+  });
+
+  it('sync_bulletin runs parish, retire, then proposes announcements and publishes once', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test';
+    published.length = 0;
+    const { data } = await call('sync_bulletin', {});
+    expect(data.parish.applied.weekendLabel).toBe('Weekend of November 14 / 15');
+    expect(data.retired).toHaveLength(1);
+    expect(data.announcements).toHaveLength(2);
+    expect(data.created).toBeNull();
+    expect(data.published).toBe(true);
+    expect(published).toHaveLength(1);
   });
 
   it('upsert_slides rejects an invalid payload at the schema', () => {

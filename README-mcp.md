@@ -33,6 +33,10 @@ at its own domain.
 | `create_email_slides({ items[], deactivatePrevious?, publish? })` | Step 2: create the reviewed slides in an "Email blast · <date>" collection, turn off last week's, publish. |
 | `read_bulletin({ url?, text? })` | Mass intentions, Mass association and Sanctuary candle from the weekly bulletin PDF (newest on sainthelen.org by default). Deterministic parse, no model call. |
 | `update_parish_slides({ fromBulletin?, weekendLabel?, weekendRows?, weekdayRows?, associationNames?, candle?, publish? })` | Save those onto the three parish slides, like the "This week" page. `fromBulletin: true` reads and applies in one step. |
+| `read_bulletin({ …, includeAnnouncements? })` | With `includeAnnouncements: true` also returns the bulletin's announcements as proposed slides, each marked `alreadyOnScreens` when a matching slide is on. |
+| `create_bulletin_slides({ items[], skipDuplicates?, deactivatePrevious?, publish? })` | Create chosen bulletin announcements in a "Bulletin · <date>" collection, skipping ones already on the screens. |
+| `retire_past_slides({ dryRun?, publish? })` | Turn off announcements whose end date or event date has passed. Never pins, takeovers or the parish slides. |
+| `sync_bulletin({ url?, text?, createAnnouncements?, retirePast?, publish? })` | The weekly routine in one call: parish slides from the bulletin, retire past announcements, propose (or create) the bulletin's announcements, publish once. |
 | `get_screen_status()` | Counts, staged-but-unpublished changes, each TV online/offline, last ingest/MCP activity, and the templates with their fields. |
 
 Everything written is **staged** until published, exactly like edits in the
