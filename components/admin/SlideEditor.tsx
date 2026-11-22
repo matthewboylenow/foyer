@@ -459,7 +459,7 @@ export function SlideEditor({
               </h3>
               {!isNew && initialSlide && (
                 <a
-                  href={`/display/__preview?slideId=${initialSlide.id}&orientation=${activeOrientation}`}
+                  href={`/display/preview?slideId=${initialSlide.id}&orientation=${activeOrientation}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs text-navy underline"

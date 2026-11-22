@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import { BlurFill } from '@/components/player/BlurFill';
 import { GradientShift } from '@/components/motion/GradientShift';
 import { WordStagger } from '@/components/motion/WordStagger';
 import { BlurIn } from '@/components/motion/BlurIn';
@@ -54,6 +56,9 @@ function parseSublineLines(html: string): string[] {
 
 export function ParishIdentity({ content, orientation = 'portrait', logoUrl, bgImageUrl, bgVideoUrl, bgVideoExternal }: ParishIdentityProps) {
   const { headline, subline, logoSize, headlineSize } = content;
+  // Only used when this template owns its own <video> (admin previews); the
+  // player mounts the video itself and passes bgVideoExternal.
+  const [localVideo, setLocalVideo] = useState<HTMLVideoElement | null>(null);
 
   const logoMaxWidth = resolveLogoWidth(logoSize);
   const headlinePx = resolveSize(PARISH_IDENTITY_HEADLINE_SIZE, headlineSize);
@@ -72,16 +77,20 @@ export function ParishIdentity({ content, orientation = 'portrait', logoUrl, bgI
       {/* Background media (video > image > gradient fallback) */}
       {bgVideoUrl ? (
         bgVideoExternal ? null : (
-          <video
-            src={bgVideoUrl}
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="auto"
-            className="absolute inset-0 w-full h-full"
-            style={{ objectFit: content.bgVideoFit ?? 'cover' }}
-          />
+          <>
+            {content.bgVideoFit === 'contain' && <BlurFill video={localVideo} />}
+            <video
+              ref={setLocalVideo}
+              src={bgVideoUrl}
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="auto"
+              className="absolute inset-0 w-full h-full"
+              style={{ objectFit: content.bgVideoFit ?? 'cover' }}
+            />
+          </>
         )
       ) : bgImageUrl ? (
         <KenBurns src={bgImageUrl} duration={28000} />

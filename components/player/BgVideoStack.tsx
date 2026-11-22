@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { BlurFill } from './BlurFill';
 
 interface BgVideoStackProps {
   urls: string[];
@@ -14,21 +15,41 @@ interface BgVideoStackProps {
  * <video> element behind the slide layer. Only the active URL is opaque + playing;
  * the others are paused and hidden. Because the elements never unmount, Tizen /
  * Chromium can keep the bytes resident — the prior approach remounted the
- * <video> on every slide rotation, which forced fresh Range requests to Blob
+ * <video> on every slide rotation, which forced fresh Range requests
  * each cycle and dominated transfer usage.
+ *
+ * With fit "contain" the whole video shows, and a blurred copy of its own
+ * frames fills the rest of the screen (see BlurFill) so nothing reads as
+ * a small band in the middle.
  */
 export function BgVideoStack({ urls, activeUrl, fit = 'cover' }: BgVideoStackProps) {
+  const [els, setEls] = useState<Record<string, HTMLVideoElement | null>>({});
+  const register = useCallback((url: string, el: HTMLVideoElement | null) => {
+    setEls((prev) => (prev[url] === el ? prev : { ...prev, [url]: el }));
+  }, []);
+
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {fit === 'contain' && activeUrl && <BlurFill video={els[activeUrl] ?? null} />}
       {urls.map((url) => (
-        <BgVideoEl key={url} url={url} active={url === activeUrl} fit={fit} />
+        <BgVideoEl key={url} url={url} active={url === activeUrl} fit={fit} onElement={register} />
       ))}
     </div>
   );
 }
 
-function BgVideoEl({ url, active, fit }: { url: string; active: boolean; fit: 'cover' | 'contain' }) {
-  const ref = useRef<HTMLVideoElement>(null);
+function BgVideoEl({
+  url,
+  active,
+  fit,
+  onElement,
+}: {
+  url: string;
+  active: boolean;
+  fit: 'cover' | 'contain';
+  onElement: (url: string, el: HTMLVideoElement | null) => void;
+}) {
+  const ref = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -45,7 +66,10 @@ function BgVideoEl({ url, active, fit }: { url: string; active: boolean; fit: 'c
 
   return (
     <video
-      ref={ref}
+      ref={(el) => {
+        ref.current = el;
+        onElement(url, el);
+      }}
       src={url}
       muted
       loop
