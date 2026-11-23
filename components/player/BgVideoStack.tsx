@@ -51,6 +51,14 @@ function BgVideoEl({
 }) {
   const ref = useRef<HTMLVideoElement | null>(null);
 
+  // Hand the element up once per mount. (An inline callback ref here
+  // re-ran on every render, detaching and reattaching, and each pass set
+  // state in the parent: an infinite update loop, React error #185.)
+  useEffect(() => {
+    onElement(url, ref.current);
+    return () => onElement(url, null);
+  }, [url, onElement]);
+
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -66,10 +74,7 @@ function BgVideoEl({
 
   return (
     <video
-      ref={(el) => {
-        ref.current = el;
-        onElement(url, el);
-      }}
+      ref={ref}
       src={url}
       muted
       loop
