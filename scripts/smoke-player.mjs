@@ -66,8 +66,13 @@ const playlist = {
   ],
 };
 
+// Google Chrome, not Playwright's bundled Chromium: the TVs play H.264, and
+// the open-source build cannot decode it, so a missing codec would look
+// like a broken player. CHROME_PATH points at a local Chrome; otherwise
+// Playwright's "chrome" channel (`npx playwright install chrome`) is used.
 const browser = await chromium.launch({
   executablePath: process.env.CHROME_PATH || undefined,
+  channel: process.env.CHROME_PATH ? undefined : 'chrome',
   args: ['--autoplay-policy=no-user-gesture-required'],
 });
 const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
@@ -109,10 +114,11 @@ if (seen.size < 2) problems.push(`slides did not advance (saw ${seen.size} disti
 if (heartbeats < 1) problems.push('no heartbeat was sent');
 const videoOk = await page.evaluate(() => {
   const v = document.querySelector('video');
-  return v ? { readyState: v.readyState, paused: v.paused, time: v.currentTime } : null;
+  return v ? { readyState: v.readyState, paused: v.paused, time: v.currentTime, error: v.error ? `${v.error.code} ${v.error.message}` : null } : null;
 });
 if (!videoOk) problems.push('no <video> element mounted for the background loop');
-else if (videoOk.readyState < 2) problems.push(`background video never loaded (readyState ${videoOk.readyState})`);
+else if (videoOk.error) problems.push(`background video failed: ${videoOk.error}`);
+else if (videoOk.readyState < 2) problems.push(`background video never loaded (readyState ${videoOk.readyState}; is this browser able to decode H.264?)`);
 
 await browser.close();
 

@@ -39,7 +39,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chrome
       - run: pnpm smoke
       - name: Upload smoke server log on failure
         if: failure()
