@@ -7,6 +7,7 @@ import type { Slide, SlideContent, Tenant } from '@/lib/db/schema';
 import { logAudit } from '@/lib/auth/session';
 import { getPublishStatus, publishPlaylist } from '@/lib/publish';
 import { agentStatus } from '@/lib/monitoring';
+import { getPlayerErrorStats } from '@/lib/fleet';
 import { IngestError, IngestRequestSchema, TEMPLATE_CATALOG, splitSourceKey, upsertSlides } from '@/lib/ingest';
 import { htmlToText } from '@/lib/import/html-to-text';
 import { parseEmailText } from '@/lib/import/parse-email';
@@ -245,7 +246,7 @@ export function registerFoyerTools(server: McpServer, ctx: ToolContext): void {
     {
       title: 'Screen status',
       description:
-        'What the TVs are doing: how many slides are on, which sources own them, whether anything is staged but not yet published (and what), each TV and whether it is online, the last ingest/MCP audit rows, and the templates this app supports with the fields each takes, so you can build valid upsert_slides payloads without reading code.',
+        'What the TVs are doing: how many slides are on, which sources own them, whether anything is staged but not yet published (and what), each TV with whether it is online and whether its player has reported errors in the last hour ("working" is true only when online with no errors), the last ingest/MCP audit rows, and the templates this app supports with the fields each takes, so you can build valid upsert_slides payloads without reading code.',
       inputSchema: z.object({}),
     },
     async () => {
@@ -291,15 +292,23 @@ export function registerFoyerTools(server: McpServer, ctx: ToolContext): void {
           stagedChanges: status.changes.map((c) => `${c.title || 'Untitled'} (${c.kind})`),
           upToDate: !status.dirty,
         },
-        displays: tvs.map((d) => ({
-          id: d.id,
-          name: d.name,
-          location: d.location,
-          orientation: d.orientation,
-          enabled: d.active,
-          status: agentStatus(d.lastHeartbeatAt),
-          lastHeartbeatAt: iso(d.lastHeartbeatAt),
-        })),
+        displays: await Promise.all(
+          tvs.map(async (d) => {
+            const errs = await getPlayerErrorStats(d.id, 60 * 60 * 1000);
+            return {
+              id: d.id,
+              name: d.name,
+              location: d.location,
+              orientation: d.orientation,
+              enabled: d.active,
+              status: agentStatus(d.lastHeartbeatAt),
+              lastHeartbeatAt: iso(d.lastHeartbeatAt),
+              playerErrorsLastHour: errs.count,
+              lastPlayerError: errs.lastMessage,
+              working: agentStatus(d.lastHeartbeatAt) === 'online' && errs.count === 0,
+            };
+          }),
+        ),
         recentActivity: audit.map((a) => ({ at: iso(a.createdAt), action: a.action, by: a.userEmail ?? a.userId, target: a.targetId, details: a.metadata })),
         templates: TEMPLATE_CATALOG,
         ingestContract: {

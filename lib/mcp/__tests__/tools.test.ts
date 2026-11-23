@@ -47,6 +47,7 @@ vi.mock('@/lib/db/client', () => ({
     update: () => ({ set: (v: unknown) => ({ where: async () => void updates.push(v) }) }),
   },
 }));
+vi.mock('@/lib/fleet', () => ({ getPlayerErrorStats: async () => ({ count: 0, lastAt: null, lastMessage: null }) }));
 vi.mock('@/lib/auth/session', () => ({ logAudit: async (row: { action: string }) => void audit.push(row) }));
 vi.mock('@/lib/publish', () => ({
   publishPlaylist: async (...a: unknown[]) => {
@@ -176,7 +177,7 @@ describe('registerFoyerTools', () => {
   it('get_screen_status reports counts by source, TVs and the template catalog', async () => {
     const { data } = await call('get_screen_status');
     expect(data.slides.bySource).toEqual({ chat: { active: 1, inactive: 0 }, admin: { active: 0, inactive: 1 } });
-    expect(data.displays[0]).toMatchObject({ name: 'Lobby', status: 'online' });
+    expect(data.displays[0]).toMatchObject({ name: 'Lobby', status: 'online', working: true, playerErrorsLastHour: 0 });
     expect(data.screens.upToDate).toBe(false);
     expect(data.templates.find((t: { templateType: string }) => t.templateType === 'general').fields.headline).toMatch(/50 characters/);
   });

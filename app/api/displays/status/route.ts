@@ -4,7 +4,7 @@ import { displays, slides, media, settings, type SlideWithContent } from '@/lib/
 import type { AgentInfo, DisplayEvent } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
 import { getCurrentTenant } from '@/lib/tenant';
-import { getLoadStats, getOutages, getRecentEvents, noteOfflineIfSilent } from '@/lib/fleet';
+import { getLoadStats, getOutages, getPlayerErrorStats, getRecentEvents, noteOfflineIfSilent } from '@/lib/fleet';
 import {
   agentStatus,
   historyStrip,
@@ -45,6 +45,8 @@ export interface DisplayStatusPayload {
   events: DisplayEvent[];
   /** Fresh page loads in the last 24h, and who did the last one. */
   loads: { day: number; lastAt: string | null; lastUserAgent: string | null };
+  /** Errors the player reported in the last hour. 0 is the only good number. */
+  playerErrors: { hour: number; lastAt: string | null; lastMessage: string | null };
 }
 
 /**
@@ -110,6 +112,7 @@ export async function GET() {
       outages: await getOutages(d.id, 30 * DAY_MS, now),
       events: await getRecentEvents(d.id, 12),
       loads: await getLoadStats(d.id, DAY_MS, now),
+      playerErrors: await getPlayerErrorStats(d.id, 60 * 60 * 1000, now),
     })),
   );
 
@@ -161,7 +164,7 @@ export async function GET() {
       ? { ...slide, content: effectiveContent }
       : slide;
 
-    const { outages, events, loads } = history[i];
+    const { outages, events, loads, playerErrors } = history[i];
     const since = d.createdAt ? new Date(d.createdAt) : null;
     const iso = (v: Date | string | null | undefined) => (v ? new Date(v).toISOString() : null);
 
@@ -197,6 +200,7 @@ export async function GET() {
       },
       strip: historyStrip(outages, STRIP_WINDOW_MS, STRIP_BUCKETS, { now, since }),
       loads: { day: loads.count, lastAt: loads.lastAt?.toISOString() ?? null, lastUserAgent: loads.lastUserAgent },
+      playerErrors: { hour: playerErrors.count, lastAt: playerErrors.lastAt?.toISOString() ?? null, lastMessage: playerErrors.lastMessage },
       events,
     };
   });

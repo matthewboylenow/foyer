@@ -617,6 +617,14 @@ function DisplayCard({
                   {status.loads.lastAt ? `, last ${ago(status.loads.lastAt, now)}` : ''}
                 </span>
               )}
+              {status?.playerErrors && status.playerErrors.hour > 0 ? (
+                <span className="text-xs block text-rust font-medium" title={status.playerErrors.lastMessage ?? undefined}>
+                  {status.playerErrors.hour} error{status.playerErrors.hour === 1 ? '' : 's'} in the last hour
+                  {status.playerErrors.lastAt ? `, last ${ago(status.playerErrors.lastAt, now)}` : ''}
+                </span>
+              ) : status?.playerErrors ? (
+                <span className="text-xs block text-emerald-700">no player errors in the last hour</span>
+              ) : null}
             </Fact>
             <Fact label="Device">
               {isPi && info ? (

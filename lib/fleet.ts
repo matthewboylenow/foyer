@@ -1,6 +1,6 @@
 import { and, count, desc, eq, gte, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { displays, displayEvents, playlistSnapshots, settings, slides, tenants } from '@/lib/db/schema';
+import { displays, displayEvents, errors, playlistSnapshots, settings, slides, tenants } from '@/lib/db/schema';
 import type { AgentCommand, Display, DisplayEvent, Settings } from '@/lib/db/schema';
 import {
   OFFLINE_AFTER_SEC,
@@ -237,6 +237,37 @@ export async function getLoadStats(displayId: string, windowMs: number, now = Da
     count: Number(agg?.n ?? 0),
     lastAt: last?.at ? new Date(last.at) : null,
     lastUserAgent: typeof ua === 'string' ? ua : null,
+  };
+}
+
+export interface PlayerErrorStats {
+  /** Error reports from this display's player in the window. */
+  count: number;
+  lastAt: Date | null;
+  lastMessage: string | null;
+}
+
+/**
+ * What the player on a display has reported (window errors, slide crashes,
+ * watchdog reloads) recently. A screen can heartbeat happily while showing
+ * an error page, so this is the honest "is it working" signal.
+ */
+export async function getPlayerErrorStats(displayId: string, windowMs: number, now = Date.now()): Promise<PlayerErrorStats> {
+  const from = new Date(now - windowMs);
+  const [agg] = await db
+    .select({ n: count() })
+    .from(errors)
+    .where(and(eq(errors.displayId, displayId), gte(errors.createdAt, from)));
+  const [last] = await db
+    .select({ at: errors.createdAt, message: errors.message })
+    .from(errors)
+    .where(and(eq(errors.displayId, displayId), gte(errors.createdAt, from)))
+    .orderBy(desc(errors.createdAt))
+    .limit(1);
+  return {
+    count: Number(agg?.n ?? 0),
+    lastAt: last?.at ? new Date(last.at) : null,
+    lastMessage: last?.message ? last.message.slice(0, 200) : null,
   };
 }
 
