@@ -15,6 +15,53 @@ export const ONLINE_WITHIN_SEC = 150;
 export const STALE_WITHIN_SEC = 300;
 /** A player quiet for longer than this is recorded as an outage. */
 export const OFFLINE_AFTER_SEC = STALE_WITHIN_SEC;
+
+// ─── Quiet hours ─────────────────────────────────────────────────────────────
+//
+// The TVs are dark overnight but the players stay on. Between QUIET_HOURS
+// (default 23:00 to 06:00 Eastern) the player heartbeats every ten minutes
+// instead of every minute, the outage cron does nothing, and the offline
+// threshold stretches to match, so the database can go to sleep and the
+// function bill is not spent on an empty lobby. Set QUIET_HOURS="" to turn
+// this off, or e.g. "22-7".
+
+export const QUIET_TZ = 'America/New_York';
+export const QUIET_HEARTBEAT_SEC = 600;
+/** Offline threshold while quiet: a missed beat and a half. */
+export const QUIET_OFFLINE_AFTER_SEC = QUIET_HEARTBEAT_SEC * 1.5 + 60;
+
+export interface QuietHours {
+  /** Hour (0-23) quiet starts, in QUIET_TZ. */
+  from: number;
+  /** Hour (0-23) quiet ends. */
+  to: number;
+  tz: string;
+}
+
+export function parseQuietHours(spec: string | undefined = process.env.QUIET_HOURS): QuietHours | null {
+  if (spec === undefined) spec = '23-6';
+  const m = /^\s*(\d{1,2})\s*-\s*(\d{1,2})\s*$/.exec(spec);
+  if (!m) return null;
+  const from = Number(m[1]);
+  const to = Number(m[2]);
+  if (from > 23 || to > 23 || from === to) return null;
+  return { from, to, tz: QUIET_TZ };
+}
+
+function localHour(now: Date, tz: string): number {
+  return Number(now.toLocaleString('en-US', { timeZone: tz, hour: 'numeric', hour12: false }).replace(/^24$/, '0'));
+}
+
+export function isQuietHour(now: Date = new Date(), quiet: QuietHours | null = parseQuietHours()): boolean {
+  if (!quiet) return false;
+  const h = localHour(now, quiet.tz);
+  return quiet.from < quiet.to ? h >= quiet.from && h < quiet.to : h >= quiet.from || h < quiet.to;
+}
+
+/** How long a player may go silent before it counts as offline, right now. */
+export function offlineAfterSec(now: Date = new Date()): number {
+  return isQuietHour(now) ? QUIET_OFFLINE_AFTER_SEC : OFFLINE_AFTER_SEC;
+}
 /** Agent check-in cadence (see public/pi/foyer-agent.sh) and threshold. */
 export const AGENT_INTERVAL_SEC = 60;
 export const AGENT_ONLINE_WITHIN_SEC = 180;
@@ -30,8 +77,9 @@ export interface Outage {
 export function playerStatus(lastHeartbeatAt: Date | string | null, now = Date.now()): LiveStatus {
   if (!lastHeartbeatAt) return 'offline';
   const age = (now - new Date(lastHeartbeatAt).getTime()) / 1000;
-  if (age <= ONLINE_WITHIN_SEC) return 'online';
-  if (age <= STALE_WITHIN_SEC) return 'stale';
+  const quiet = isQuietHour(new Date(now));
+  if (age <= (quiet ? QUIET_HEARTBEAT_SEC + 90 : ONLINE_WITHIN_SEC)) return 'online';
+  if (age <= (quiet ? QUIET_OFFLINE_AFTER_SEC : STALE_WITHIN_SEC)) return 'stale';
   return 'offline';
 }
 

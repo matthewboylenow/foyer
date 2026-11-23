@@ -35,6 +35,7 @@ export default auth((req: NextRequest & { auth: unknown }) => {
       !pathname.startsWith('/api/otp') &&
       !pathname.startsWith('/api/errors') &&
       !pathname.startsWith('/api/cron') &&
+      !pathname.startsWith('/api/health') &&
       // Token-authenticated, server-to-server (see their route files).
       !pathname.startsWith('/api/mcp') &&
       !pathname.startsWith('/api/ingest');

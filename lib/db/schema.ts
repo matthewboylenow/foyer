@@ -232,6 +232,7 @@ export const slides = pgTable('slides', {
   uniqueIndex('slides_tenant_source_id_uq')
     .on(t.tenantId, t.sourceId)
     .where(sql`${t.sourceId} is not null`),
+  index('slides_tenant_active_idx').on(t.tenantId, t.active),
 ]);
 
 /**
@@ -343,7 +344,7 @@ export const auditLog = pgTable('audit_log', {
   targetId: text('target_id'),
   metadata: jsonb('metadata').default({}),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [index('audit_log_tenant_created_idx').on(t.tenantId, t.createdAt)]);
 
 /**
  * Runtime errors captured from anywhere in the system (player template
@@ -366,7 +367,10 @@ export const errors = pgTable('errors', {
   displayId: uuid('display_id'),
   slideId: uuid('slide_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index('errors_display_created_idx').on(t.displayId, t.createdAt),
+  index('errors_created_idx').on(t.createdAt),
+]);
 
 // ─── TypeScript content types per template ───────────────────────────────────
 

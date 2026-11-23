@@ -2,6 +2,7 @@ import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { playlistSnapshots, slides } from '@/lib/db/schema';
 import type { PlaylistSnapshot, Slide, SnapshotSlide } from '@/lib/db/schema';
+import { invalidateVersionCache } from '@/lib/fleet';
 
 /**
  * "Publish to screens."
@@ -105,6 +106,7 @@ export async function publishPlaylist(
       .where(and(eq(playlistSnapshots.tenantId, tenantId), lt(playlistSnapshots.publishedAt, oldest)));
   }
 
+  invalidateVersionCache();
   return created;
 }
 

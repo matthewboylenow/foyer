@@ -1,5 +1,6 @@
 import { getEligibleSlides, getDisplayById } from '@/lib/db/queries';
 import { computePlaylistVersion, recordPageLoad } from '@/lib/fleet';
+import { QUIET_HEARTBEAT_SEC, parseQuietHours } from '@/lib/monitoring';
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
@@ -39,8 +40,9 @@ export async function GET(
     if (!ifNoneMatch && display) {
       void recordPageLoad(display, req.headers.get('user-agent')).catch(() => {});
     }
+    const quiet = parseQuietHours();
     return Response.json(
-      { orientation, slides, version },
+      { orientation, slides, version, quietHours: quiet ? { ...quiet, heartbeatSec: QUIET_HEARTBEAT_SEC } : null },
       { headers: etag ? { ...NO_STORE, ETag: etag } : NO_STORE },
     );
   } catch (err) {

@@ -36,6 +36,8 @@ type PlayerSlide = {
 
 type ApiResponse = {
   orientation: SlideOrientation;
+  /** From the server: when to beat slowly (overnight). */
+  quietHours?: { from: number; to: number; tz: string; heartbeatSec: number } | null;
   slides: PlayerSlide[];
   /** Playlist fingerprint from the server (see lib/fleet.ts). */
   version?: string | null;
@@ -118,6 +120,8 @@ export function Player({ displayId }: PlayerProps) {
   const [bannedIds, setBannedIds] = useState<Set<string>>(() => new Set());
   // Last playlist version we loaded (also sent as If-None-Match).
   const versionRef = useRef<string | null>(null);
+  const quietRef = useRef<ApiResponse['quietHours']>(null);
+  const lastBeatRef = useRef(0);
   // Mirror of `slides` for callbacks that shouldn't re-subscribe on change.
   const slidesRef = useRef<PlayerSlide[]>([]);
   slidesRef.current = slides;
@@ -177,6 +181,7 @@ export function Player({ displayId }: PlayerProps) {
           if (data?.slides && data.slides.length > 0) {
             saveToCache(displayId, data);
             versionRef.current = data.version ?? null;
+            quietRef.current = data.quietHours ?? null;
             setOrientation(data.orientation);
             setSlides(data.slides);
             setPool(buildShuffledPool(data.slides));
@@ -216,6 +221,7 @@ export function Player({ displayId }: PlayerProps) {
       const data = (await res.json()) as ApiResponse;
       if (!data?.slides) return;
       versionRef.current = data.version ?? null;
+      quietRef.current = data.quietHours ?? null;
       // Orientation can change live if the admin flips a display; update
       // immediately so subsequent renders use the new aspect / templates.
       setOrientation((prev) => (data.orientation !== prev ? data.orientation : prev));
@@ -353,8 +359,26 @@ export function Player({ displayId }: PlayerProps) {
       }
     }
 
-    void beat();
-    const ping = setInterval(beat, HEARTBEAT_MS);
+    // Tick every minute, but overnight (quiet hours from the server) only
+    // actually beat every quietHours.heartbeatSec so the database can
+    // sleep. The server's offline threshold stretches to match.
+    function due(): boolean {
+      const q = quietRef.current;
+      let interval = HEARTBEAT_MS;
+      if (q) {
+        const h = Number(new Date().toLocaleString('en-US', { timeZone: q.tz, hour: 'numeric', hour12: false }).replace(/^24$/, '0'));
+        const quiet = q.from < q.to ? h >= q.from && h < q.to : h >= q.from || h < q.to;
+        if (quiet) interval = q.heartbeatSec * 1000;
+      }
+      return Date.now() - lastBeatRef.current >= interval - 500;
+    }
+    const tick = () => {
+      if (!due()) return;
+      lastBeatRef.current = Date.now();
+      void beat();
+    };
+    tick();
+    const ping = setInterval(tick, HEARTBEAT_MS);
     return () => {
       cancelled = true;
       clearInterval(ping);

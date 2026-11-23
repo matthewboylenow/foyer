@@ -1,4 +1,5 @@
 import { Player } from '@/components/player/Player';
+import { PlayerBoundary } from '@/components/player/PlayerBoundary';
 import { TenantTheme } from '@/components/TenantTheme';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +12,9 @@ export default async function DisplayPage({
   const { displayId } = await params;
   return (
     <TenantTheme>
-      <Player displayId={displayId} />
+      <PlayerBoundary displayId={displayId}>
+        <Player displayId={displayId} />
+      </PlayerBoundary>
     </TenantTheme>
   );
 }

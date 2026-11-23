@@ -3,8 +3,9 @@ import { db } from '@/lib/db/client';
 import { displays, displayEvents, errors, playlistSnapshots, settings, slides, tenants } from '@/lib/db/schema';
 import type { AgentCommand, Display, DisplayEvent, Settings } from '@/lib/db/schema';
 import {
-  OFFLINE_AFTER_SEC,
   formatDuration,
+  isQuietHour,
+  offlineAfterSec,
   parseEmailList,
   type Outage,
 } from '@/lib/monitoring';
@@ -34,7 +35,24 @@ import { getResend, resolveFromAddress } from '@/lib/email';
  * part of the hash — a slide edit still bumps `updated_at`, so the only
  * cost is an occasional refetch that yields an identical playlist.
  */
+/** Two players on one display heartbeat within seconds of each other; a
+ *  short cache turns their version checks into one query. Per instance. */
+const versionCache = new Map<string, { at: number; version: string | null }>();
+const VERSION_CACHE_MS = 20_000;
+
+export function invalidateVersionCache(): void {
+  versionCache.clear();
+}
+
 export async function computePlaylistVersion(displayId: string): Promise<string | null> {
+  const hit = versionCache.get(displayId);
+  if (hit && Date.now() - hit.at < VERSION_CACHE_MS) return hit.version;
+  const version = await computePlaylistVersionUncached(displayId);
+  versionCache.set(displayId, { at: Date.now(), version });
+  return version;
+}
+
+async function computePlaylistVersionUncached(displayId: string): Promise<string | null> {
   const now = new Date();
   // Snapshot term: the latest snapshot's id plus which of its slides are
   // inside their dates right now (so an expiry still bumps the version).
@@ -102,7 +120,7 @@ export async function noteOfflineIfSilent(display: Display, now = new Date()): P
   const lastMs = display.lastHeartbeatAt ? new Date(display.lastHeartbeatAt).getTime() : null;
   // A display that has never heart-beat is "not set up yet", not an outage.
   if (lastMs === null) return display;
-  if ((now.getTime() - lastMs) / 1000 <= OFFLINE_AFTER_SEC) return display;
+  if ((now.getTime() - lastMs) / 1000 <= offlineAfterSec(now)) return display;
 
   const since = new Date(lastMs);
   // Guard against a concurrent writer (cron + status request at once):
@@ -271,6 +289,52 @@ export async function getPlayerErrorStats(displayId: string, windowMs: number, n
   };
 }
 
+/** Error reports older than this are dropped by the cron. */
+export const ERROR_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+export async function pruneOldErrors(now = new Date()): Promise<number> {
+  const cutoff = new Date(now.getTime() - ERROR_RETENTION_MS);
+  const rows = await db.delete(errors).where(lt(errors.createdAt, cutoff)).returning({ id: errors.id });
+  return rows.length;
+}
+
+/** A burst of player errors this big inside ERROR_BURST_WINDOW_MS gets an email. */
+export const ERROR_BURST_COUNT = 3;
+export const ERROR_BURST_WINDOW_MS = 15 * 60 * 1000;
+/** At most one error email per display per hour. */
+const ERROR_ALERT_COOLDOWN_MS = 60 * 60 * 1000;
+
+/**
+ * A screen can heartbeat happily while showing an error page, so outage
+ * alerts alone are not enough. When a display's player has reported
+ * ERROR_BURST_COUNT or more errors in the last ERROR_BURST_WINDOW_MS, send
+ * the tenant's alert emails one message (then stay quiet for an hour).
+ */
+export async function alertOnPlayerErrors(all: Display[], now = new Date()): Promise<number> {
+  let sent = 0;
+  for (const d of all) {
+    const stats = await getPlayerErrorStats(d.id, ERROR_BURST_WINDOW_MS, now.getTime());
+    if (stats.count < ERROR_BURST_COUNT) continue;
+    const [recent] = await db
+      .select({ at: displayEvents.at })
+      .from(displayEvents)
+      .where(and(eq(displayEvents.displayId, d.id), eq(displayEvents.kind, 'error_alert'), gte(displayEvents.at, new Date(now.getTime() - ERROR_ALERT_COOLDOWN_MS))))
+      .limit(1);
+    if (recent) continue;
+    const ok = await sendDisplayAlert(d, 'errors', { errorCount: stats.count, lastMessage: stats.lastMessage ?? undefined });
+    if (!ok) continue;
+    await db.insert(displayEvents).values({
+      tenantId: d.tenantId,
+      displayId: d.id,
+      kind: 'error_alert',
+      at: now,
+      meta: { count: stats.count, lastMessage: stats.lastMessage },
+    });
+    sent++;
+  }
+  return sent;
+}
+
 export async function pruneLoadEvents(now = new Date()): Promise<number> {
   const cutoff = new Date(now.getTime() - LOAD_EVENT_RETENTION_MS);
   const rows = await db
@@ -332,8 +396,8 @@ async function tenantContext(tenantId: string): Promise<{ settings: Settings | u
 
 export async function sendDisplayAlert(
   display: Display,
-  kind: 'down' | 'up',
-  info: { downForSec?: number; since?: Date } = {},
+  kind: 'down' | 'up' | 'errors',
+  info: { downForSec?: number; since?: Date; errorCount?: number; lastMessage?: string } = {},
 ): Promise<boolean> {
   const { settings: s, name } = await tenantContext(display.tenantId);
   const to = parseEmailList(s?.alertEmails);
@@ -344,9 +408,22 @@ export async function sendDisplayAlert(
   const subject =
     kind === 'down'
       ? `Screen down: ${display.name}`
-      : `Screen back: ${display.name}`;
+      : kind === 'errors'
+        ? `Screen showing errors: ${display.name}`
+        : `Screen back: ${display.name}`;
   const body =
-    kind === 'down'
+    kind === 'errors'
+      ? [
+          `The "${display.name}"${where} screen's player has reported ${info.errorCount ?? 'several'} errors in the last 15 minutes.`,
+          'It is online, but it may be showing an error page instead of the slides.',
+          info.lastMessage ? `Last error: ${info.lastMessage}` : '',
+          '',
+          'Check the Displays page (the card shows the errors) or open the display URL in a browser:',
+          adminUrl,
+          '',
+          `If a change was just published, that is the first thing to undo. — ${name}`,
+        ]
+      : kind === 'down'
       ? [
           `The "${display.name}"${where} screen has stopped checking in.`,
           info.since ? `Last seen ${info.since.toLocaleString('en-US', { timeZone: 'America/New_York' })} Eastern.` : '',
@@ -379,11 +456,20 @@ export async function sendDisplayAlert(
  * where needed and send "down" alerts once the tenant's threshold has
  * passed. Returns counts for the cron's JSON response.
  */
-export async function runDisplayCheck(now = new Date()): Promise<{ checked: number; newOutages: number; alerted: number }> {
+export async function runDisplayCheck(now = new Date()): Promise<{ checked: number; newOutages: number; alerted: number; errorAlerts?: number; quiet?: boolean }> {
+  // Overnight the lobby is dark and the players beat slowly; touching the
+  // database every five minutes would only keep it awake.
+  if (isQuietHour(now)) return { checked: 0, newOutages: 0, alerted: 0, quiet: true };
+
   const all = await db.query.displays.findMany({ where: eq(displays.active, true) });
   let newOutages = 0;
   let alerted = 0;
   await pruneLoadEvents(now).catch((err) => console.error('[fleet] prune load events failed', err));
+  await pruneOldErrors(now).catch((err) => console.error('[fleet] prune errors failed', err));
+  const errorAlerts = await alertOnPlayerErrors(all, now).catch((err) => {
+    console.error('[fleet] error alerts failed', err);
+    return 0;
+  });
 
   const settingsByTenant = new Map<string, Settings | undefined>();
 
@@ -437,5 +523,5 @@ export async function runDisplayCheck(now = new Date()): Promise<{ checked: numb
     }
   }
 
-  return { checked: all.length, newOutages, alerted };
+  return { checked: all.length, newOutages, alerted, errorAlerts };
 }

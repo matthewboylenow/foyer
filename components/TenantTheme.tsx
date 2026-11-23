@@ -49,8 +49,16 @@ function mix(hex: string, target: string, t: number): string {
  * base color toward white/black so tenants don't have to set every swatch.
  */
 export async function TenantTheme({ children }: { children: React.ReactNode }) {
-  const tenant = await getCurrentTenant();
-  const settings = tenant ? await getSettingsByTenant(tenant.id) : null;
+  // The player page must render even when the database is unreachable:
+  // the TV then runs on its cached playlist and the brand defaults below.
+  // A theme lookup failure is logged, never thrown.
+  let settings: Awaited<ReturnType<typeof getSettingsByTenant>> | null = null;
+  try {
+    const tenant = await getCurrentTenant();
+    settings = tenant ? await getSettingsByTenant(tenant.id) : null;
+  } catch (err) {
+    console.error('[TenantTheme] settings unavailable, using defaults:', err instanceof Error ? err.message : err);
+  }
 
   const navy = settings?.primaryColor || DEFAULTS.navy;
   const rust = settings?.accentColor || DEFAULTS.rust;

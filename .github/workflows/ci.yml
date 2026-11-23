@@ -1,0 +1,65 @@
+# Every push to main is checked here before it can reach the screens.
+# Vercel's production branch is `release`; only this workflow pushes to it,
+# and only after type-check, lint, unit tests, the production build and a
+# real-browser run of the player all pass.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:9/ci
+      AUTH_SECRET: ci-only-not-a-real-secret-0000000000000
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm type-check
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+      - run: npx playwright install --with-deps chromium
+      - run: pnpm smoke
+      - name: Upload smoke server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-server-log
+          path: /tmp/foyer-smoke-server.log
+          if-no-files-found: ignore
+
+  release:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fast-forward release to main
+        run: |
+          git config user.name "foyer-ci"
+          git config user.email "ci@users.noreply.github.com"
+          git push origin HEAD:refs/heads/release

@@ -218,3 +218,34 @@ The Displays page shows how many times each screen's page was loaded in
 the last 24 hours. A kiosk that reloads on its own schedule re-downloads
 every background each time; that number is the first thing to check when
 transfer looks high.
+
+## Operations
+
+**Release flow.** `main` is where work lands; `release` is what Vercel
+deploys to foyer.sainthelen.org. GitHub Actions (`.github/workflows/ci.yml`)
+runs type-check, lint, unit tests, the production build and the player
+smoke test on every push to `main`, and fast-forwards `release` only when
+all of it passes. Locally, `pnpm verify` runs the same checks. To roll back,
+push the previous good commit to `release` (or use Vercel's instant rollback).
+
+**Is it working?** Three signals, in order of truth:
+1. Admin → Displays: green "no player errors in the last hour" under the
+   heartbeat, or a red count with the last message on hover.
+2. `GET /api/health`: 200 when the app and database answer, 503 otherwise.
+   Point an uptime monitor at it. The TVs keep playing their cached
+   playlist even when this is red.
+3. Open the display URL from the Displays card in a browser: that is
+   exactly what the TV renders.
+
+**Alerts.** With alert emails set under Settings → Screen alerts, you get
+one email when a screen stops checking in, one when it is back, and one
+when a screen's player reports three or more errors in fifteen minutes
+(at most hourly per screen).
+
+**Quiet hours.** Between `QUIET_HOURS` (default `23-6`, Eastern) players
+heartbeat every ten minutes instead of every minute and the outage cron
+stands down, so the database can suspend overnight. Offline thresholds
+stretch to match. Set `QUIET_HOURS=""` to disable.
+
+**Retention.** Player error reports are kept 30 days and page-load events
+14 days (pruned by the cron). Audit log and slides are never pruned.
