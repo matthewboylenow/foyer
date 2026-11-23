@@ -3,11 +3,15 @@
 // report the player tries to post. Run by `pnpm smoke` (see scripts/smoke.sh)
 // and by CI before anything reaches the release branch.
 //
-//   BASE_URL      where the app is served (default http://localhost:3999)
-//   CHROME_PATH   optional browser executable (otherwise Playwright's Chromium)
-//   SMOKE_SECONDS how long to watch (default 24)
+//   BASE_URL       where the app is served (default http://localhost:3999)
+//   CHROME_PATH    optional browser executable (otherwise Playwright's Chromium)
+//   SMOKE_SECONDS  how long to watch (default 24)
+//   SMOKE_VIEWPORT "WxH@dpr" the browser pretends to be (default 540x960@2,
+//                  what an Android TV WebView reports for a 1080p panel; the
+//                  canvas must come out identical to a native 1080x1920)
 
 import { chromium } from 'playwright';
+import { geometryProblems } from './player-checks.mjs';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3999';
 const DISPLAY_ID = '11111111-1111-4111-8111-111111111111';
@@ -55,6 +59,12 @@ const playlist = {
       meta: 'Saturday, December 5 · 8:30am · Gym', body: '<p>Santa is coming.</p><p><strong>Register at sainthelen.org/santa.</strong></p>',
       eventDate: '2026-12-05', qrUrl: 'https://sainthelen.org/santa', qrLabel: 'Scan to visit', motionStyle: 'lineMask', textMode: 'dark', bgImageMediaId: 'b',
     }, { resolvedMedia: { bgImageUrl: '/media/advent-glow-joy-candle.jpg' } }),
+    slide('longbody', 'general', {
+      templateType: 'general', headline: 'Advent LifeLines and the Pray25 Challenge', headlineSize: 'small',
+      meta: 'Begins Monday, November 30 · Hallow app',
+      body: '<p>Hallow\'s Pray25 Advent challenge is built around It\'s a Wonderful Life this year: a short daily prayer from November 30 through Christmas Day with Sr. Miriam James Heidland, Jonathan Roumie, Chris Pratt and Mark Wahlberg.</p><p>Our Advent LifeLines small groups meet weekly to pray through the same reflections together. Sign up in the narthex after any Mass, or scan the code to join a group online.</p><p>All are welcome, whether you have prayed with Hallow before or are just starting.</p>',
+      qrUrl: 'https://sainthelen.org/advent', qrLabel: 'Scan to join', motionStyle: 'lineMask', textMode: 'dark',
+    }),
     slide('contain', 'parish_identity', {
       templateType: 'parish_identity', headline: 'Contain', subline: '', bgVideoFit: 'contain', bgVideoMediaId: 'v',
     }, { resolvedMedia: { bgVideoUrl: '/media/hero-2026-landscape.mp4' } }),
@@ -75,7 +85,9 @@ const browser = await chromium.launch({
   channel: process.env.CHROME_PATH ? undefined : 'chrome',
   args: ['--autoplay-policy=no-user-gesture-required'],
 });
-const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
+const [, vw, vh, dpr] = /^(\d+)x(\d+)(?:@([\d.]+))?$/.exec(process.env.SMOKE_VIEWPORT ?? '540x960@2') ?? [];
+if (!vw) throw new Error('SMOKE_VIEWPORT must look like 540x960@2');
+const page = await browser.newPage({ viewport: { width: Number(vw), height: Number(vh) }, deviceScaleFactor: Number(dpr ?? 1) });
 
 const problems = [];
 let heartbeats = 0;
@@ -99,17 +111,30 @@ await page.route('**/api/errors', async (route) => {
 const res = await page.goto(`${BASE_URL}/display/${DISPLAY_ID}`, { waitUntil: 'load', timeout: 60_000 });
 if (!res || res.status() !== 200) problems.push(`page status ${res?.status()}`);
 
+// Geometry (shared with render-check): canvas laid out at design size,
+// scaled exactly to the viewport, nothing clipped. Wait for the canvas
+// first: the player shows a bare navy div until the playlist fetch and
+// hydration finish, and a slow runner must not turn that into a failure.
+try {
+  await page.waitForSelector('[data-canvas]', { timeout: 20_000 });
+} catch {
+  problems.push('no [data-canvas] element within 20 s: the slide is not being scaled to the viewport');
+}
+
 const seen = new Set();
+const geometry = new Set();
 const t0 = Date.now();
 while (Date.now() - t0 < WATCH_MS) {
   await page.waitForTimeout(1000);
   const text = await page.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').trim().slice(0, 60));
   if (text) seen.add(text);
+  for (const g of await page.evaluate(geometryProblems)) geometry.add(g);
   if (await page.evaluate(() => /Application error/i.test(document.body.innerText))) {
     problems.push('Next.js "Application error" page shown');
     break;
   }
 }
+for (const g of geometry) problems.push(g);
 if (seen.size < 2) problems.push(`slides did not advance (saw ${seen.size} distinct screen${seen.size === 1 ? '' : 's'})`);
 if (heartbeats < 1) problems.push('no heartbeat was sent');
 const videoOk = await page.evaluate(() => {
@@ -120,6 +145,24 @@ if (!videoOk) problems.push('no <video> element mounted for the background loop'
 else if (videoOk.error) problems.push(`background video failed: ${videoOk.error}`);
 else if (videoOk.readyState < 2) problems.push(`background video never loaded (readyState ${videoOk.readyState}; is this browser able to decode H.264?)`);
 
+// One off-aspect viewport too (a portrait playlist on a landscape panel),
+// so the centring and letterboxing arithmetic is exercised, not just the
+// 9:16 kiosk case where every ratio happens to be equal.
+{
+  const side = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  await side.route(`**/api/display/${DISPLAY_ID}/heartbeat`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, version: 'smoke-v1', reload: false }) }),
+  );
+  await side.route(`**/api/display/${DISPLAY_ID}`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', headers: { ETag: '"smoke-v1"' }, body: JSON.stringify(playlist) }),
+  );
+  await side.goto(`${BASE_URL}/display/${DISPLAY_ID}`, { waitUntil: 'load', timeout: 60_000 });
+  await side.waitForSelector('[data-canvas]', { timeout: 20_000 }).catch(() => {});
+  await side.waitForTimeout(1500);
+  for (const g of await side.evaluate(geometryProblems)) problems.push(`at 1920x1080: ${g}`);
+  await side.close();
+}
+
 await browser.close();
 
 if (problems.length) {
@@ -127,4 +170,4 @@ if (problems.length) {
   for (const p of problems) console.error(' -', p);
   process.exit(1);
 }
-console.log(`SMOKE OK: ${seen.size} screens, ${heartbeats} heartbeats, video readyState ${videoOk.readyState}`);
+console.log(`SMOKE OK at ${vw}x${vh}@${dpr ?? 1}: ${seen.size} screens, ${heartbeats} heartbeats, video readyState ${videoOk.readyState}`);

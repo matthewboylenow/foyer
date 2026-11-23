@@ -33,7 +33,8 @@ import { templates } from '@/components/templates';
 import { UptimeStrip } from './UptimeStrip';
 import { PiSetupDialog } from './PiSetupDialog';
 import { decodeThrottled, formatDuration } from '@/lib/monitoring';
-import type { AgentCommand, Display, DisplayEvent, SlideContent, SlideOrientation } from '@/lib/db/schema';
+import type { AgentCommand, Display, DisplayEvent, DisplayViewport, SlideContent, SlideOrientation } from '@/lib/db/schema';
+import { CANVAS } from '@/components/player/FitCanvas';
 import type { DisplayStatusPayload } from '@/app/api/displays/status/route';
 
 const TEMPLATE_LABELS: Record<string, string> = Object.fromEntries(
@@ -61,6 +62,12 @@ const BASE_URL =
   typeof window !== 'undefined'
     ? window.location.origin
     : process.env.NEXT_PUBLIC_APP_URL ?? '';
+
+/** The factor FitCanvas applies on this TV (1 = native 1080×1920). */
+function canvasScale(v: DisplayViewport, orientation: SlideOrientation): number {
+  const c = CANVAS[orientation];
+  return Math.min(v.w / c.w, v.h / c.h);
+}
 
 function ago(iso: string | null, now: number): string {
   if (!iso) return 'never';
@@ -625,6 +632,13 @@ function DisplayCard({
               ) : status?.playerErrors ? (
                 <span className="text-xs block text-emerald-700">no player errors in the last hour</span>
               ) : null}
+              {status?.viewport && (
+                <span className="text-xs block text-navy/50" title="What the TV's browser reports; the slide canvas is scaled to fit it.">
+                  renders at {status.viewport.w}×{status.viewport.h}
+                  {status.viewport.dpr !== 1 ? ` @${status.viewport.dpr}×` : ''}
+                  {` · canvas scaled ${Math.round(canvasScale(status.viewport, orientation) * 100)}%`}
+                </span>
+              )}
             </Fact>
             <Fact label="Device">
               {isPi && info ? (

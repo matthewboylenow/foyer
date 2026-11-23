@@ -235,7 +235,12 @@ push the previous good commit to `release` (or use Vercel's instant rollback).
    Point an uptime monitor at it. The TVs keep playing their cached
    playlist even when this is red.
 3. Open the display URL from the Displays card in a browser: that is
-   exactly what the TV renders.
+   exactly what the TV renders, at any window size. The slide is laid out
+   on a fixed 1080×1920 canvas and scaled to the screen, so text is the
+   same size on every device. The Displays card shows what each TV's
+   browser reports ("renders at 540×960 @2×"); if a screen ever looks
+   wrong, save its playlist JSON and run `pnpm render-check` to see every
+   slide the way that device does.
 
 **Alerts.** With alert emails set under Settings → Screen alerts, you get
 one email when a screen stops checking in, one when it is back, and one

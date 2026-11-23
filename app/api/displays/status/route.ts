@@ -1,7 +1,7 @@
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { displays, slides, media, settings, type SlideWithContent } from '@/lib/db/schema';
-import type { AgentInfo, DisplayEvent } from '@/lib/db/schema';
+import type { AgentInfo, DisplayEvent, DisplayViewport } from '@/lib/db/schema';
 import { auth } from '@/lib/auth/config';
 import { getCurrentTenant } from '@/lib/tenant';
 import { getLoadStats, getOutages, getPlayerErrorStats, getRecentEvents, noteOfflineIfSilent } from '@/lib/fleet';
@@ -47,6 +47,8 @@ export interface DisplayStatusPayload {
   loads: { day: number; lastAt: string | null; lastUserAgent: string | null };
   /** Errors the player reported in the last hour. 0 is the only good number. */
   playerErrors: { hour: number; lastAt: string | null; lastMessage: string | null };
+  /** The browser's viewport as last reported by the heartbeat. */
+  viewport: DisplayViewport | null;
 }
 
 /**
@@ -201,6 +203,7 @@ export async function GET() {
       strip: historyStrip(outages, STRIP_WINDOW_MS, STRIP_BUCKETS, { now, since }),
       loads: { day: loads.count, lastAt: loads.lastAt?.toISOString() ?? null, lastUserAgent: loads.lastUserAgent },
       playerErrors: { hour: playerErrors.count, lastAt: playerErrors.lastAt?.toISOString() ?? null, lastMessage: playerErrors.lastMessage },
+      viewport: d.viewport ?? null,
       events,
     };
   });

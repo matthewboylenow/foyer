@@ -1,14 +1,23 @@
 import { db } from '@/lib/db/client';
-import { displays } from '@/lib/db/schema';
+import { displays, type DisplayViewport } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { computePlaylistVersion, resolveOutage } from '@/lib/fleet';
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
+/** Public route: accept only sane integers, never store arbitrary JSON. */
+function parseViewport(v: unknown): DisplayViewport | null {
+  if (!v || typeof v !== 'object') return null;
+  const { w, h, dpr } = v as Record<string, unknown>;
+  const ok = (n: unknown, max: number) => typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= max;
+  if (!ok(w, 10_000) || !ok(h, 10_000) || !ok(dpr, 10)) return null;
+  return { w: Math.round(w as number), h: Math.round(h as number), dpr: Math.round((dpr as number) * 100) / 100 };
+}
+
 /**
  * POST /api/display/[displayId]/heartbeat
  *
- * Body: { slideId: string | null }
+ * Body: { slideId: string | null, viewport?: { w, h, dpr } }
  *
  * Called by the TV player once a minute (not on every slide change — that
  * was ~6,500 requests per display per day). Unauthenticated by design —
@@ -31,9 +40,11 @@ export async function POST(
   const now = new Date();
 
   let slideId: string | null = null;
+  let viewport: DisplayViewport | null = null;
   try {
-    const body = (await req.json()) as { slideId?: string | null };
+    const body = (await req.json()) as { slideId?: string | null; viewport?: unknown };
     slideId = typeof body?.slideId === 'string' ? body.slideId : null;
+    viewport = parseViewport(body?.viewport);
   } catch {
     // Empty body — treat as "still alive, no slide change."
   }
@@ -46,6 +57,9 @@ export async function POST(
   }
 
   const slideChanged = slideId && slideId !== existing.currentSlideId;
+  const prior = existing.viewport;
+  const viewportChanged =
+    !!viewport && (!prior || prior.w !== viewport.w || prior.h !== viewport.h || prior.dpr !== viewport.dpr);
   const reload = !!existing.reloadRequestedAt;
 
   const [, version] = await Promise.all([
@@ -54,6 +68,7 @@ export async function POST(
       .set({
         lastHeartbeatAt: now,
         ...(slideChanged ? { currentSlideId: slideId, currentSlideStartedAt: now } : {}),
+        ...(viewportChanged ? { viewport } : {}),
         ...(reload ? { reloadRequestedAt: null } : {}),
       })
       .where(eq(displays.id, displayId)),

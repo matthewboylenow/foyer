@@ -74,6 +74,12 @@ export const displays = pgTable('displays', {
    *  (hostname, ip, cpuTempC, uptimeSec, chromiumRunning, throttled…). */
   agentLastSeenAt: timestamp('agent_last_seen_at', { withTimezone: true }),
   agentInfo: jsonb('agent_info').$type<AgentInfo | null>(),
+  /** What the player's browser reports as its viewport (CSS px) and
+   *  device-pixel-ratio, from the heartbeat. The TVs do not all report
+   *  1080×1920: an Android WebView on a 1080p panel at dpr 2 says 540×960.
+   *  FitCanvas scales the design canvas to whatever this is; the Displays
+   *  card shows it so a wrong-looking screen is diagnosable in one glance. */
+  viewport: jsonb('viewport').$type<DisplayViewport | null>(),
   /** One queued command for the agent to pick up on its next check-in:
    *  'reboot' | 'reload' | 'screenshot' | 'update'. Cleared when handed
    *  over. Only one at a time — a newer request replaces the older one. */
@@ -504,6 +510,12 @@ export type SlideContent =
 
 /** Vitals the Raspberry Pi agent reports on every check-in. Every field is
  *  optional — older agents or non-Pi hardware may send a subset. */
+export interface DisplayViewport {
+  w: number;
+  h: number;
+  dpr: number;
+}
+
 export type AgentInfo = {
   agentVersion?: string;
   hostname?: string;

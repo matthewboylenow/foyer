@@ -68,7 +68,7 @@ export class PlayerBoundary extends Component<Props, State> {
     return (
       <div
         className="w-full h-full flex items-center justify-center bg-navy-900 text-cream font-serif"
-        style={{ fontSize: 72, textAlign: 'center', padding: 80, lineHeight: 1.2 }}
+        style={{ fontSize: 'min(72px, 8vw)', textAlign: 'center', padding: '8vw', lineHeight: 1.2 }}
       >
         Saint Helen Parish
       </div>

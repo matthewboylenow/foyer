@@ -1,0 +1,1 @@
+ALTER TABLE "displays" ADD COLUMN "viewport" jsonb;

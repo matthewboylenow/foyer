@@ -18,11 +18,28 @@ fast-forwards `release`, which is Vercel's production branch. If `verify`
 is red, do not push.
 
 The smoke test (`scripts/smoke-player.mjs`) boots `/display/<id>` with a
-mocked playlist against a database that cannot answer, and fails on any
-page error, console error, error report, missing video, or a player that
-does not advance. Any change to `components/player/*`, the templates, the
-display page or `middleware.ts` must keep it green; extend the fixture when
-you add a template or a media path.
+mocked playlist against a database that cannot answer, in a browser that
+pretends to be a kiosk (540×960 at device-pixel-ratio 2, what the Android
+WebViews on the TVs report), and fails on any page error, console error,
+error report, missing video, a player that does not advance, a canvas that
+does not fill the viewport, clipped body text, or a headline outside the
+canvas. Any change to `components/player/*`, the templates, the display
+page or `middleware.ts` must keep it green; extend the fixture when you
+add a template or a media path.
+
+Before pushing anything that changes how a slide looks, also run
+`pnpm render-check --playlist <saved GET /api/display/<id> JSON>` against
+a local server and look at the PNGs. That is the only way to see what the
+wall will show; a unit test cannot.
+
+## The canvas rule
+
+Templates are drawn in absolute pixels on a 1080×1920 (or 1920×1080)
+canvas and `FitCanvas` scales that canvas to the real viewport. Never
+render a template outside `FitCanvas` (player, preview page) or outside a
+scaled wrapper (admin thumbnails); never use `vw`/`vh` or viewport media
+queries inside a template. The TVs do not report 1080×1920: the Displays
+card shows what each one reports ("renders at 540×960 @2×").
 
 ## What the player must survive
 

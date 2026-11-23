@@ -71,6 +71,7 @@ export function AutoFitText({
   return (
     <div
       ref={ref}
+      data-autofit
       className={className}
       style={{ ...style, fontSize: maxSize }}
       dangerouslySetInnerHTML={{ __html: html }}

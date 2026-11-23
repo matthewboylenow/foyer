@@ -17,12 +17,21 @@ export function BlurFill({ video, active = true }: { video: HTMLVideoElement | n
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Match the canvas aspect to the screen so the fill is not stretched.
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0) {
-      canvas.height = 96;
-      canvas.width = Math.max(16, Math.round((96 * rect.width) / rect.height));
-    }
+    // Match the bitmap's aspect to the box so the fill is not stretched,
+    // and again whenever the box changes shape (a live orientation flip
+    // turns the design canvas from 9:16 to 16:9 under us).
+    const size = () => {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const w = Math.max(16, Math.round((96 * rect.width) / rect.height));
+      if (canvas.width !== w || canvas.height !== 96) {
+        canvas.height = 96;
+        canvas.width = w;
+      }
+    };
+    size();
+    const observer = new ResizeObserver(size);
+    observer.observe(canvas);
 
     let raf = 0;
     let last = 0;
@@ -42,7 +51,10 @@ export function BlurFill({ video, active = true }: { video: HTMLVideoElement | n
       ctx.drawImage(video, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
     };
     raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
   }, [video, active]);
 
   return (

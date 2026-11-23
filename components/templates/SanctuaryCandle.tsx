@@ -125,13 +125,17 @@ export function SanctuaryCandle({ content, orientation = 'portrait', bgImageUrl 
                 <stop offset="100%" stopColor="#D4AF37" stopOpacity="0" />
               </radialGradient>
             </defs>
-            {/* Halo glow around flame */}
+            {/* Halo glow around flame. Explicit `initial` on each animated
+                SVG attribute: without it, motion's first render writes
+                rx/ry/d as "undefined" and Chrome logs an error per frame
+                element, which the smoke test treats as a failure. */}
             <motion.ellipse
               cx="40"
               cy="50"
               rx="30"
               ry="40"
               fill="url(#flameGlow)"
+              initial={{ rx: 28, ry: 40, opacity: 0.7 }}
               animate={{ rx: [28, 32, 26, 28], ry: [40, 44, 38, 40], opacity: [0.7, 1, 0.6, 0.7] }}
               transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
             />
@@ -147,6 +151,7 @@ export function SanctuaryCandle({ content, orientation = 'portrait', bgImageUrl 
             <motion.path
               d="M40 68 C34 60 30 48 40 32 C50 48 46 60 40 68 Z"
               fill="#D4AF37"
+              initial={{ d: 'M40 68 C34 60 30 48 40 32 C50 48 46 60 40 68 Z', opacity: 0.95 }}
               animate={{
                 d: [
                   'M40 68 C34 60 30 48 40 32 C50 48 46 60 40 68 Z',
@@ -166,6 +171,7 @@ export function SanctuaryCandle({ content, orientation = 'portrait', bgImageUrl 
               rx="6"
               ry="10"
               fill="#FFF3C4"
+              initial={{ ry: 10, opacity: 0.7 }}
               animate={{ ry: [10, 12, 9, 10], opacity: [0.7, 0.95, 0.5, 0.7] }}
               transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut' }}
             />

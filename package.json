@@ -15,6 +15,7 @@
     "db:seed": "sh -c 'DATABASE_URL=$(grep \"^DATABASE_URL=\" .env.local | cut -d= -f2-) tsx lib/db/seed.ts'",
     "db:studio": "drizzle-kit studio",
     "smoke": "bash scripts/smoke.sh",
+    "render-check": "node scripts/render-check.mjs",
     "verify": "pnpm type-check && pnpm lint && pnpm test && pnpm build && pnpm smoke"
   },
   "dependencies": {

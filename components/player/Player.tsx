@@ -5,6 +5,7 @@ import { getImageProps } from 'next/image';
 import { SlideFrame } from './SlideFrame';
 import { SlideErrorBoundary } from './SlideErrorBoundary';
 import { BgVideoStack } from './BgVideoStack';
+import { FitCanvas } from './FitCanvas';
 import { buildShuffledPool, slidesHaveChanged } from './shuffle';
 import { templates } from '@/components/templates';
 import { reportError } from '@/lib/reportError';
@@ -341,7 +342,10 @@ export function Player({ displayId }: PlayerProps) {
         const res = await fetch(`/api/display/${displayId}/heartbeat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slideId: currentSlideIdRef.current }),
+          body: JSON.stringify({
+            slideId: currentSlideIdRef.current,
+            viewport: { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio || 1 },
+          }),
           cache: 'no-store',
           keepalive: true,
         });
@@ -448,32 +452,38 @@ export function Player({ displayId }: PlayerProps) {
   const currentVideoFit =
     (current.content as { bgVideoFit?: 'cover' | 'contain' } | null)?.bgVideoFit ?? 'cover';
 
+  // Everything on screen lives inside the design canvas (see FitCanvas),
+  // so a TV that reports a 540×960 viewport shows exactly what the admin
+  // preview shows. The navy outside is only visible if the panel's aspect
+  // ratio differs from the canvas.
   return (
     <div className="relative w-full h-full bg-navy-900">
-      <BgVideoStack urls={poolVideoUrls} activeUrl={currentVideoUrl} fit={currentVideoFit} />
-      <SlideFrame
-        slideId={`${current.id}-${currentIndex}`}
-        holdMs={holdMs}
-        onDone={handleSlideDone}
-      >
-        <SlideErrorBoundary
-          displayId={displayId}
-          slideId={current.id}
-          templateType={current.templateType}
-          onBadSlide={banSlide}
+      <FitCanvas orientation={orientation}>
+        <BgVideoStack urls={poolVideoUrls} activeUrl={currentVideoUrl} fit={currentVideoFit} />
+        <SlideFrame
+          slideId={`${current.id}-${currentIndex}`}
+          holdMs={holdMs}
+          onDone={handleSlideDone}
         >
-          <SlideComponent
-            content={current.content}
-            orientation={orientation}
-            logoUrl={resolved.logoUrl}
-            bgImageUrl={resolved.bgImageUrl}
-            bgVideoUrl={resolved.bgVideoUrl}
-            bgVideoExternal
-            phoneMockupUrl={resolved.phoneMockupUrl}
-            imageUrl={resolved.imageUrl}
-          />
-        </SlideErrorBoundary>
-      </SlideFrame>
+          <SlideErrorBoundary
+            displayId={displayId}
+            slideId={current.id}
+            templateType={current.templateType}
+            onBadSlide={banSlide}
+          >
+            <SlideComponent
+              content={current.content}
+              orientation={orientation}
+              logoUrl={resolved.logoUrl}
+              bgImageUrl={resolved.bgImageUrl}
+              bgVideoUrl={resolved.bgVideoUrl}
+              bgVideoExternal
+              phoneMockupUrl={resolved.phoneMockupUrl}
+              imageUrl={resolved.imageUrl}
+            />
+          </SlideErrorBoundary>
+        </SlideFrame>
+      </FitCanvas>
     </div>
   );
 }
